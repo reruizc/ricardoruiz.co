@@ -405,7 +405,8 @@
       const hash=s=>{ let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))|0; return Math.abs(h); };
       const pos=A.map((a,i)=>{
         let x;
-        if(a.postura==null){ x=.5+((hash(a.n)%1000)/1000-.5)*band*.8; }
+        if(a.postura==null&&a.tiende!=null){ x=.5+Math.sign(a.tiende)*band*(.3+((hash(a.n)%1000)/1000)*.12); }
+        else if(a.postura==null){ x=.5+((hash(a.n)%1000)/1000-.5)*band*.8; }
         else { const v=Math.max(-1,Math.min(1,a.postura)); x=v<0?(.5-band/2)*(1+v*.92):(.5+band/2)+(.5-band/2)*v*.92; }
         const y=1-Math.max(0,Math.min(1,a.cerca==null?.25:a.cerca))+((hash(a.n+'y')%1000)/1000-.5)*.08;
         const r=6+16*Math.sqrt((a.peso||1)/mx);
@@ -414,7 +415,7 @@
       const bx=m.l+(.5-band/2)*iw, bw=band*iw;
       /* separar burbujas que se pisan, sin sacarlas de su franja: las sin
          posición se quedan en la franja central; las demás, en su mitad */
-      const lim=p=>p.a.postura==null?[bx+p.r*.6,bx+bw-p.r*.6]:p.a.postura<0?[m.l+p.r,bx-p.r*.3]:[bx+bw+p.r*.3,m.l+iw-p.r];
+      const lim=p=>p.a.postura==null&&p.a.tiende!=null?(p.a.tiende>0?[bx+bw/2+p.r*.2,bx+bw-p.r*.4]:[bx+p.r*.4,bx+bw/2-p.r*.2]):p.a.postura==null?[bx+p.r*.6,bx+bw-p.r*.6]:p.a.postura<0?[m.l+p.r,bx-p.r*.3]:[bx+bw+p.r*.3,m.l+iw-p.r];
       for(let it=0;it<140;it++){
         let mov=false;
         for(let i=0;i<pos.length;i++) for(let j=i+1;j<pos.length;j++){
@@ -445,13 +446,13 @@
         <text x="${m.l-8}" y="${m.t+ih/2}" class="fz-pl-y" transform="rotate(-90 ${m.l-8} ${m.t+ih/2})" text-anchor="middle">su sector</text>
         <text x="${m.l-8}" y="${m.t+ih*5/6}" class="fz-pl-y" transform="rotate(-90 ${m.l-8} ${m.t+ih*5/6})" text-anchor="middle">conversación</text>
         <text x="${m.l+iw/2}" y="${H-10}" class="fz-pl-y" text-anchor="middle">← postura pública →  ·  ↑ qué tan directo le toca  ·  tamaño = peso en la conversación</text>
-        ${pos.sort((p,q)=>q.r-p.r).map(p=>`<circle class="fz-act" data-i="${p.i}" cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.r.toFixed(1)}" fill="${TIPO_COL[p.a.tipo]||'#5d6271'}" fill-opacity="${p.a.postura==null?.35:.8}" stroke="${TIPO_COL[p.a.tipo]||'#5d6271'}" stroke-width="1.2"/>`).join('')}
+        ${pos.sort((p,q)=>q.r-p.r).map(p=>`<circle class="fz-act" data-i="${p.i}" cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.r.toFixed(1)}" fill="${TIPO_COL[p.a.tipo]||'#5d6271'}" fill-opacity="${p.a.postura==null?.35:.8}" stroke="${TIPO_COL[p.a.tipo]||'#5d6271'}" stroke-width="${p.a.postura==null&&p.a.tiende!=null?1.6:1.2}"${p.a.postura==null&&p.a.tiende!=null?' stroke-dasharray="3 2"':''}/>`).join('')}
         ${lbl.map(p=>`<text x="${p.lx.toFixed(1)}" y="${(p.cy-p.r-4).toFixed(1)}" class="fz-pl-l" text-anchor="middle">${esc(p.t)}</text>`).join('')}
       </svg>`;
     }
     function tipActor(a){
-      const pt=a.postura==null?'No se ha pronunciado en la prensa revisada':a.postura>0?`A favor (${a.postura>=.66?'claro':'con matices'})`:`En contra (${a.postura<=-.66?'claro':'con matices'})`;
-      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}${a.region?' · '+esc(a.region):''}</div>${a.quien?`<div style="opacity:.8">${esc(a.quien)}</div>`:''}<div style="margin-top:.25rem"><b>${esc(pt)}</b></div><div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div>${(a.exige||[]).length?`<div style="margin-top:.3rem">El texto le exige:</div><ul style="margin:.15rem 0 0;padding-left:1rem">${a.exige.map(x=>`<li>${esc(cut(x,150))}</li>`).join('')}</ul>`:''}<div style="margin-top:.25rem">${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
+      const pt=a.postura==null&&a.tiende!=null?`Sin posición declarada · tiende ${a.tiende>0?'a favor':'en contra'}`:a.postura==null?'No se ha pronunciado en la prensa revisada':a.postura>0?`A favor (${a.postura>=.66?'claro':'con matices'})`:`En contra (${a.postura<=-.66?'claro':'con matices'})`;
+      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}${a.region?' · '+esc(a.region):''}</div>${a.quien?`<div style="opacity:.8">${esc(a.quien)}</div>`:''}<div style="margin-top:.25rem"><b>${esc(pt)}</b></div>${a.postura==null&&a.tiende_por?`<div style="opacity:.85">Por qué esa inclinación: ${esc(a.tiende_por)}</div>`:''}<div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div>${(a.exige||[]).length?`<div style="margin-top:.3rem">El texto le exige:</div><ul style="margin:.15rem 0 0;padding-left:1rem">${a.exige.map(x=>`<li>${esc(cut(x,150))}</li>`).join('')}</ul>`:''}<div style="margin-top:.25rem">${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
     }
     async function externos(my){
       const pb=$('fz-plano'), ab=$('fz-actores');
@@ -464,8 +465,8 @@
       $('fz-ext-t').textContent=D.manual&&!D.n_titulares?`${A.length} actores · curados a mano el ${fechaCorta(D.curado)||D.curado}`:`${A.length} actores · ${D.n_titulares||0} titulares en ${D.dias||60} días`;
       if(!A.length){ pb.innerHTML='<div class="mc-empty">No encontramos gremios, empresas ni organizaciones que toque este proyecto o que hayan hablado de él. Que nadie se haya movido también es un dato.</div>'; ab.innerHTML=''; return; }
       const conP=A.filter(a=>a.postura!=null), fav=conP.filter(a=>a.postura>0).length, con=conP.length-fav;
-      pb.innerHTML=plano(D)+`<div class="mc-legend" style="margin:.5rem 0 .3rem">${Object.keys(TIPO_T).filter(t=>A.some(a=>a.tipo===t)).map(t=>`<span><i style="background:${TIPO_COL[t]}"></i>${esc(TIPO_T[t])}</span>`).join('')}<span>Círculo claro = sin posición pública</span></div>
-        <div class="mc-callout">${conP.length?`<b>${fav}</b> se han pronunciado a favor y <b>${con}</b> en contra. `:'Nadie se ha pronunciado en la prensa revisada. '}${A.length-conP.length?`<b>${A.length-conP.length}</b> ${A.length-conP.length===1?'actor no ha dicho':'actores no han dicho'} nada en público`:'Todos los actores encontrados ya se pronunciaron'}${A.filter(a=>a.postura==null&&enTexto(a)).length?`, y de ellos <b>${A.filter(a=>a.postura==null&&enTexto(a)).length}</b> aparecen en el texto${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length?` (<b>${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length}</b> con obligaciones que les impone)`:''}: son los primeros a quienes buscar`:''}.</div>
+      pb.innerHTML=plano(D)+`<div class="mc-legend" style="margin:.5rem 0 .3rem">${Object.keys(TIPO_T).filter(t=>A.some(a=>a.tipo===t)).map(t=>`<span><i style="background:${TIPO_COL[t]}"></i>${esc(TIPO_T[t])}</span>`).join('')}<span>Círculo claro = sin posición pública</span>${A.some(a=>a.postura==null&&a.tiende!=null)?'<span>Borde punteado = no se ha declarado, pero lo que dijo inclina hacia ese lado</span>':''}</div>
+        <div class="mc-callout">${conP.length?`<b>${fav}</b> se han pronunciado a favor y <b>${con}</b> en contra. `:'Nadie se ha pronunciado en la prensa revisada. '}${A.length-conP.length?`<b>${A.length-conP.length}</b> ${A.length-conP.length===1?'actor no ha dicho':'actores no han dicho'} nada en público${A.filter(a=>a.postura==null&&a.tiende!=null).length?` (<b>${A.filter(a=>a.postura==null&&a.tiende!=null).length}</b> sin declararse, aunque lo que dijeron inclina hacia un lado)`:''}`:'Todos los actores encontrados ya se pronunciaron'}${A.filter(a=>a.postura==null&&enTexto(a)).length?`, y de ellos <b>${A.filter(a=>a.postura==null&&enTexto(a)).length}</b> aparecen en el texto${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length?` (<b>${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length}</b> con obligaciones que les impone)`:''}: son los primeros a quienes buscar`:''}.</div>
         <p class="note">${esc(D.nota||'')} La postura la lee un modelo de lenguaje en el titular y siempre va con la cita: ábrela antes de usarla.</p>`;
       pb.querySelectorAll('.fz-act').forEach(c=>{ const a=A[+c.dataset.i]; MC.tipOn(c,()=>tipActor(a)); });
       /* «en tu territorio»: actores de la región de la nota de trabajo de esta persona */
@@ -473,7 +474,7 @@
       const REG=N&&N.region?A.filter(a=>a.region===N.region):[];
       const grupos=[['A favor',a=>a.postura!=null&&a.postura>0],['En contra',a=>a.postura!=null&&a.postura<0],['Sin posición pública',a=>a.postura==null]];
       ab.innerHTML=(REG.length?`<div class="fz-g fz-terr" style="margin-bottom:.9rem"><h4>En tu territorio · ${esc(N.region)} · ${REG.length}</h4>${REG.map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${a.postura==null?'sin posición pública':a.postura>0?'a favor':'en contra'} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · ${esc(cut(a.exige[0],120))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${REG.every(a=>a.postura==null)?`<p class="note">Nadie de ${esc(N.region)} ha fijado posición pública todavía: es el espacio que puedes ocupar.</p>`:''}</div>`:'')+grupos.map(([t,f])=>{ const L=A.filter(f).sort((p,q)=>(q.cerca||0)-(p.cerca||0)||((q.cerca_por==='obliga')-(p.cerca_por==='obliga'))||(q.peso||0)-(p.peso||0)); if(!L.length) return '';
-        return `<div class="fz-g" style="margin-bottom:.9rem"><h4>${esc(t)} · ${L.length}</h4>${L.slice(0,12).map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${esc(TIPO_T[a.tipo]||'')} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · le exige: ${esc(cut(a.exige[0],110))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${L.length>12?`<p class="note">y ${L.length-12} más en el plano.</p>`:''}</div>`; }).join('');
+        return `<div class="fz-g" style="margin-bottom:.9rem"><h4>${esc(t)} · ${L.length}</h4>${L.slice(0,12).map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${a.postura==null&&a.tiende!=null?`<b>tiende ${a.tiende>0?'a favor':'en contra'}</b> · `:''}${esc(TIPO_T[a.tipo]||'')} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · le exige: ${esc(cut(a.exige[0],110))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${L.length>12?`<p class="note">y ${L.length-12} más en el plano.</p>`:''}</div>`; }).join('');
     }
 
     vista(VISTA);
