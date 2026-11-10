@@ -28,8 +28,8 @@ C = {
     'marca': 'Ley de Rescate · PL 477 de 2026 Cámara · desde la tarde del lunes 9',
     'titulo': 'Liberales y uribistas le cierran la puerta al IVA a los alimentos, y el Gobierno negocia un crédito con el FMI',
     'hl': 'y el Gobierno negocia un crédito con el FMI',
-    'lead': 'Lo que pasó entre la tarde del lunes 9 y la mañana del martes 10. El trámite no se movió: '
-            'el proyecto sigue en comisión y sin ponentes asignados, según Portafolio.',
+    'lead': 'Lo que pasó entre la tarde del lunes 9 y el martes 10. Primer movimiento del trámite: Blu Radio '
+            'informa que David Barguil (Conservador) fue designado ponente; la ficha de la Cámara aún no lo registra.',
     'frentes': [
         {'dir': 'En el Congreso', 'color': '#d9480f', 'que': 'Nadie pone la cara por el IVA a la canasta',
          'tx': 'El Partido Liberal pide aplazar la rebaja de renta a empresas y no pasar alimentos ni insumos '
@@ -50,14 +50,14 @@ C = {
     'centro': 'Las mesas técnicas de esta semana definen el texto que llega al primer debate. Con el IVA a los '
               'alimentos sin quién lo vote, la pregunta es con qué se reemplaza ese recaudo.',
     'fechas': [
-        {'d': 'Hoy', 't': 'Sigue en comisión, sin ponentes asignados'},
+        {'d': 'Hoy', 't': 'Barguil, ponente según Blu Radio; falta que lo registre la ficha'},
         {'d': 'Esta semana', 't': 'Mesas técnicas Gobierno y comisiones económicas'},
         {'d': 'Jue 12', 't': 'La subcomisión del Centro Democrático fija postura'},
         {'d': 'Jue 19', 't': 'Paro nacional convocado por la CUT'},
         {'d': 'Mié 16 dic', 't': 'Cierra el primer periodo de sesiones'},
     ],
     'fuentes': 'Fuentes: Portafolio (9 y 10-nov) · Infobae (10-nov) · La República (9-nov, CARF y FMI vía Bloomberg) · '
-               'Valora Analitik (9-nov) · El Nuevo Siglo (9-nov) · Tabla 14 del PL 477, p. 204',
+               'Valora Analitik (9-nov) · El Nuevo Siglo (9-nov) · Blu Radio (10-nov) · Tabla 14 del PL 477, p. 204',
 }
 
 
