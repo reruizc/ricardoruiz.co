@@ -14,6 +14,27 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
   <script defer src="/track.js"></script>
+  <style>
+  .vf-q{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.4rem;align-items:start}
+  .vf-dijo{border-left:3px solid var(--cauce);padding:.2rem 0 .2rem 1rem}
+  .vf-dijo blockquote{font-size:1.15rem;line-height:1.4;font-weight:500}
+  .vf-dijo small{display:block;margin-top:.5rem;color:var(--ink3);font-size:.78rem}
+  .vf-ver{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rechaza);font-weight:700}
+  .vf-ver+h3{font-size:1.25rem;margin:.25rem 0 .5rem}
+  .vf-res{color:var(--ink2);line-height:1.55;font-size:.92rem}
+  .vf-barras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8rem;height:190px;position:relative;margin:1.2rem 0 .3rem;padding-top:1.2rem}
+  .vf-barras .meta{position:absolute;left:0;right:0;border-top:2px dashed var(--ink);z-index:2}
+  .vf-barras .meta span{position:absolute;left:0;top:-1.25rem;background:var(--bg2);padding-right:.3rem;font-size:.72rem;font-weight:700}
+  .vf-col{display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;height:100%;position:relative;padding:0 14%}
+  .vf-col i{display:block}
+  .vf-col b{position:absolute;left:0;right:0;text-align:center;font-size:.85rem}
+  .vf-col span{position:absolute;bottom:-1.3rem;left:0;right:0;text-align:center;font-size:.75rem;color:var(--ink3)}
+  .vf-ley{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.75rem;color:var(--ink2);margin-top:1.8rem}
+  .vf-ley i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.3rem;vertical-align:-1px}
+  .vf-ctx{margin-top:1rem;font-size:.86rem;line-height:1.55;color:var(--ink2);background:var(--teal-soft);border-radius:10px;padding:.8rem 1rem}
+  .vf-f{margin-top:.7rem;font-size:.74rem;color:var(--ink3)}
+  @media (max-width:760px){.vf-q{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
   <main class="wrap">
@@ -25,6 +46,7 @@
       <section class="bloque"><div class="k">Termómetro de medios y redes</div><h2>¿Qué tan caliente está la discusión?</h2><p class="sub">Entre los textos que toman postura, cuánto rechazo hay. Cada texto cuenta una vez, aunque toque varios temas, y los reparos cuentan como medio rechazo.</p>
         <div class="panel termo-p"><div class="termos" id="termos"></div><div><div id="lect"></div><h4 class="mini-t">Cómo ha cambiado por día</h4><div class="termo-dias" id="tdias"></div></div></div></section>
       <section class="bloque"><div class="k">En una línea</div><div class="panel"><div id="puntos" class="puntos4"></div></div></section>
+      <section class="bloque" id="verif-b" hidden><div class="k">Verificación</div><h2>Lo que se dijo y lo que dice el proyecto</h2><p class="sub">Una frase de la discusión contrastada con el texto radicado. Las cifras del proyecto son las de su propia tabla de impacto fiscal (p. 204), en % del PIB.</p><div class="panel" id="verif"></div></section>
       <section class="bloque"><div class="k">El camino</div><h2>En qué etapa va</h2><p class="sub">Una ley necesita cuatro debates. Toque cada etapa para ver qué pasa ahí y qué norma la exige.</p><div class="panel"><div class="ruta" id="etapas" style="margin-top:0"></div><div class="etinfo" id="etinfo"></div></div></section>
       <section class="bloque"><div class="k">Para entrar más</div><h2>Todo el seguimiento</h2><div class="lr-cards" id="cards"></div></section>
     </div>
@@ -69,6 +91,21 @@ LR.pagina('hub', E => {
     ['Votos', `Declarados en contra: ${cuenta('senado', 'no')} de ${camaras.senado.total} en Senado y ${cuenta('camara', 'no')} de ${camaras.camara.total} en Cámara. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${tSi('senado')} de ${camaras.senado.total} en Senado y ${tSi('camara')} de ${camaras.camara.total} en Cámara: hacen falta ${camaras.senado.mayoria} y ${camaras.camara.mayoria}.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]
     .map(([a, b]) => `<div class="punto"><b>${a}</b><span>${b}</span></div>`).join('');
+  const VF = (E.verificaciones || []).slice(-1)[0];
+  if (VF) {
+    const tot = VF.anios.map((_, i) => VF.componentes.reduce((a, c) => a + c.v[i], 0)), top = 1.2, COL = ['#3d6eb8', '#c8553d', '#d9a441'], pc = x => String(x.toFixed(2)).replace('.', ',');
+    const barras = VF.anios.map((a, i) => `<div class="vf-col" data-tip="${a}: ${VF.componentes.map(c => `${c.k} ${pc(c.v[i])}%`).join(' · ')}"><b style="bottom:${100 * tot[i] / top}%">${pc(tot[i])}%</b>${[...VF.componentes].reverse().map((c, k) => `<i style="height:${100 * c.v[i] / top}%;background:${COL[VF.componentes.length - 1 - k]}"></i>`).join('')}<span>${a}</span></div>`).join('');
+    $('#verif').innerHTML = `<div class="vf-q"><div class="vf-dijo"><blockquote>«${esc(VF.dijo)}»</blockquote><small><b>${esc(VF.quien)}</b> · ${esc(VF.cargo)} · <a href="${esc(VF.url)}" target="_blank" rel="noopener">${esc(VF.donde)}</a></small></div>
+      <div><div class="vf-ver">Veredicto</div><h3>${esc(VF.veredicto)}</h3><p class="vf-res">${esc(VF.resumen)}</p></div></div>
+      <h4 class="mini-t">Recortes de gasto que cuantifica el proyecto, % del PIB</h4>
+      <div class="vf-barras"><div class="meta" style="bottom:${100 / top}%"><span>1 punto del PIB</span></div>${barras}</div>
+      <div class="vf-ley">${VF.componentes.map((c, k) => `<span><i style="background:${COL[k]}"></i>${esc(c.k)}</span>`).join('')}</div>
+      <h4 class="mini-t">Medida por medida</h4>
+      <table class="tb"><thead><tr><th>Medida</th><th>Lo que dijo</th><th>Lo que dice el proyecto</th></tr></thead><tbody>${VF.filas.map(f => `<tr><td><b>${esc(f.m)}</b><small>${esc(f.art)}</small></td><td>${esc(f.dijo)}</td><td>${esc(f.texto)}<small>${esc(f.nota)}</small></td></tr>`).join('')}</tbody></table>
+      <div class="vf-ctx">${esc(VF.contexto)}</div>
+      <div class="vf-f">Fuentes: ${VF.fuentes.map(f => `<a href="${esc(f.u)}"${f.u.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${esc(f.t)}</a>`).join(' · ')}. Verificado el ${corta(VF.fecha)}.</div>`;
+    $('#verif-b').hidden = false;
+  }
   let sel = (L.find(l => l.ahora) || L[L.length - 1]).id;
   function ruta() { $('#etapas').innerHTML = L.map(l => `<button class="et ${l.hecho ? 'hecho' : ''} ${l.ahora ? 'ahora' : ''} ${sel === l.id ? 'sel' : ''}" data-e="${l.id}"><i></i><b>${l.nom}</b><small>${l.hecho ? (l.f || 'hecho') : l.ahora ? 'va aquí' : ''}</small></button>`).join('');
     const x = L.find(l => l.id === sel); $('#etinfo').innerHTML = `<b>${x.nom}.</b> ${x.txt}<span class="n">${x.norma}</span>`;
