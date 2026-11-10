@@ -13,6 +13,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <style>
+    /* Sigla del partido pegada a cada cara: no todos conocen la cara de cada congresista. */
+    .as{overflow:visible}.as .cara{border-radius:50%;overflow:hidden}
+    .as .ptd{position:absolute;right:-14%;bottom:-10%;font:700 clamp(.44rem,1.05vw,.62rem)/1 'HN',Helvetica,Arial,sans-serif;letter-spacing:.02em;padding:.18em .32em;border-radius:3px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;z-index:2;white-space:nowrap}
+    .ley-pt{display:flex;flex-wrap:wrap;gap:.35rem .9rem;margin:.2rem 0 1.2rem;font-size:.74rem;color:var(--ink2)}
+    .ley-pt span{display:inline-flex;align-items:center;gap:.35rem}
+    .ley-pt .ptd{position:static;font:700 .62rem/1 'HN',Helvetica,Arial,sans-serif;padding:.2em .36em;border-radius:3px}
+  </style>
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -25,6 +33,7 @@
       <div class="panel"><div class="esc-top"><div class="pills" id="presets"></div><button class="pill" id="copiar">Copiar enlace del escenario</button></div>
         <div class="hemis" id="com"></div>
         <div class="ley"><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--informa)"></i>Sin definir</span><span><i class="pt-tsi"></i>Tiende al sí</span><span><i class="pt-tno"></i>Tiende al no</span><span style="color:var(--ink3)">Un toque: apoya · dos: rechaza · tres: sin definir</span></div></div>
+      <div class="ley-pt" id="ley-pt"></div>
       <section class="bloque"><h2>Por bancada</h2><p class="sub">Un toque cambia a toda la bancada de una vez.</p><div class="blq" id="blq"></div></section>
       <p class="aparte">La mayoría de 7 y 16 supone asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero cada comisión vota por separado. Plantillas y fotos oficiales del Senado y la Cámara.</p>
     </div>
@@ -34,6 +43,8 @@
   <script>
 const ORDEN = ['pacto', 'verde', 'paz', 'lib', 'asi', 'u', 'con', 'cr', 'cd', 'sn'];
 const FILAS = { senado: { f: [[43, 84, 8], [26, 50, 5]], w: 11.2 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
+const SIG = { pacto: ['PH', '#6b2d8b'], verde: ['AV', '#2e8b3e'], paz: ['Paz', '#7a6150'], lib: ['Lib', '#e0342b'], asi: ['ASI', '#e08a00'], u: ['U', '#f2a100', '#1b1b1b'], con: ['Con', '#2f6fd0'], cr: ['CR', '#8e1f1f'], cd: ['CD', '#0d2f6b'], sn: ['SN', '#c9a227', '#1b1b1b'] };
+const chip = id => { const [t, bg, fg] = SIG[id] || ['', '#666']; return `<span class="ptd" style="background:${bg};color:${fg || '#fff'}" aria-hidden="true">${t}</span>`; };
 const TD = { si: 'Tiende al sí', aj: 'Tiende al sí con ajustes', no: 'Tiende al no' };
 LR.pagina('votos', E => {
   const { $, esc, cara } = LR, { bloques, camaras } = E.votos, bl = id => bloques.find(b => b.id === id), V = {};
@@ -44,7 +55,7 @@ LR.pagina('votos', E => {
   function resumen(c) { const ms = miembros(c), si = ms.filter(m => est(m) === 'si').length, no = ms.filter(m => est(m) === 'no').length; return { si, no, sin: ms.length - si - no, C: camaras[c] }; }
   function arma() {
     $('#com').innerHTML = ['senado', 'camara'].map(c => { const C = camaras[c], ms = miembros(c), pos = asientos(c), w = FILAS[c].w;
-      const sillas = ms.map((m, i) => { const n = E.personas[m.s]?.n || m.s, tip = `<b>${esc(n)}</b><br>${esc(m.b.nombre)}${dicho[m.s] ? '<br>' + esc(dicho[m.s]) : ''}`; return `<button class="as" style="left:${pos[i].x}%;top:${pos[i].y}%;width:${w}%" data-s="${m.s}" data-tip="${esc(tip)}">${cara(E, m.s, n).replace(' loading="lazy"', '')}</button>`; }).join('');
+      const sillas = ms.map((m, i) => { const n = E.personas[m.s]?.n || m.s, tip = `<b>${esc(n)}</b><br>${esc(m.b.nombre)}${dicho[m.s] ? '<br>' + esc(dicho[m.s]) : ''}`; return `<button class="as" style="left:${pos[i].x}%;top:${pos[i].y}%;width:${w}%" data-s="${m.s}" data-tip="${esc(tip)}">${cara(E, m.s, n).replace(' loading="lazy"', '')}${chip(m.b.id)}</button>`; }).join('');
       return `<div class="hemi" data-c="${c}"><h3>${C.nombre}</h3><div class="hemi-box ${c}">${sillas}<div class="hemi-c"><b></b><span>de ${C.mayoria} necesarios</span></div></div><div class="barra" aria-hidden="true"><i class="si"></i><i class="no"></i><u style="left:${100 * C.mayoria / C.total}%"></u></div><div class="c"></div></div>`; }).join('');
     document.querySelectorAll('.as').forEach(x => x.onclick = () => { const m = todos.find(y => y.s === x.dataset.s), o = ['sin', 'si', 'no']; V[m.s] = o[(o.indexOf(est(m)) + 1) % 3]; apagar(); pinta(); });
   }
@@ -64,6 +75,7 @@ LR.pagina('votos', E => {
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { Object.keys(V).forEach(k => delete V[k]); PRE[b.dataset.p][1](); document.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); pinta(); });
   const m0 = location.hash.match(/e=([sn.]+)/); if (m0 && m0[1].length === todos.length) { todos.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); }
   $('#copiar').onclick = async ev => { const c = todos.map(m => ({ si: 's', no: 'n', sin: '.' }[est(m)])).join(''), u = location.origin + location.pathname + '#e=' + c; history.replaceState(null, '', '#e=' + c); try { await navigator.clipboard.writeText(u); ev.target.textContent = 'Enlace copiado'; } catch { ev.target.textContent = 'Copie la dirección de esta página'; } setTimeout(() => ev.target.textContent = 'Copiar enlace del escenario', 2200); };
+  $('#ley-pt').innerHTML = ORDEN.map(id => `<span>${chip(id)}${esc(bl(id).nombre)}</span>`).join('');
   arma(); pinta();
 });
   </script>
