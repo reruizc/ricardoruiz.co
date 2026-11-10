@@ -87,6 +87,16 @@
   details.fu a{color:var(--ink2)}
   .adv{margin:14px 0 0;padding-left:18px;font-size:.86rem;color:var(--mute);line-height:1.5}
   .falta{padding:40px 0;color:var(--ink2);font-size:1.05rem}
+  .conf-datos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:16px}
+  @media(max-width:1000px){.conf-datos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:560px){.conf-datos{grid-template-columns:minmax(0,1fr)}}
+  .conf-datos .cd{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--nl-solid);border-radius:var(--r);padding:16px 18px}
+  .conf-datos b{display:block;font-family:var(--cond);font-stretch:88%;font-weight:800;font-size:2rem;line-height:1;color:#fff}
+  .conf-datos span{display:block;font-size:.9rem;line-height:1.4;color:var(--ink2);margin:8px 0}
+  .conf-datos a{font-size:.78rem;color:var(--mute)}
+  .fam{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
+  @media(max-width:900px){.fam{grid-template-columns:minmax(0,1fr)}}
+  .fam .regla{background:var(--nl-solid);border-color:var(--nl-solid)}
 </style>
 </head>
 <body>
@@ -110,7 +120,7 @@
   const CUAD={retener:'Retener','retener-crecer':'Retener y crecer',conocer:'Hacerse conocer',movilizar:'Movilizar','no-gastar':'No gastar'};
   const MOD={inventario:['inventario.html','01 El inventario'],tablero:['tablero.html','02 El análisis'],clima:['clima.html','03 Dónde estamos'],escenarios:['escenarios.html','04 Reglas y escenarios'],encuesta:['clima.html','Encuestas · módulo 03']};
   const fecha=s=>{ if(!s) return ''; const [a,m,d]=s.split('-').map(Number); return d+' '+['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]+' '+a; };
-  const cache={};
+  const cache={}; let CONF_REFS={};
   const trae=a=>cache[a]||(cache[a]=NL.dato('estrategia-'+a).catch(()=>null));
 
   function refs(D,ids,prin,oficio){
@@ -140,6 +150,20 @@
          <div class="tres"><div class="col propio"><h3>Temas propios</h3>${(L.propios||[]).map(it).join('')}</div>
          <div class="col"><h3>Temas de consenso: ser creíble</h3>${(L.consenso||[]).map(it).join('')}</div>
          <div class="col"><h3>Lo que no disputa</h3>${(L.ceder||[]).map(it).join('')}</div></div>`); }
+
+    const CF=await trae('confianza'), K=CF&&CF.ambitos&&CF.ambitos[amb];
+    if(K){ const RC=Object.fromEntries((CF.refs||[]).map(r=>[r.id,r])), D2={refs:CF.refs};
+      h+=sec(N(),K.titulo,'Sin confianza no hay estrategia que funcione. Esto es lo que dicen las encuestas y cómo se construye.',
+        `<p class="tx" style="max-width:78ch;font-size:1.08rem;color:var(--ink)">${E(K.diagnostico)}</p>
+         ${amb==='general'?`<div class="conf-datos">${CF.datos.map(d=>`<div class="cd"><b>${E(d.cifra)}</b><span>${E(d.dato)}</span><a href="${E(d.url)}" target="_blank" rel="noopener">${E(d.fuente)}</a></div>`).join('')}</div>`+
+           (K.outsider?`<p class="nota" style="margin-top:10px">${E(K.outsider.x)} <a href="${E(K.outsider.url)}" target="_blank" rel="noopener" style="color:var(--ink2)">${E(K.outsider.fuente)}</a></p>`:''):''}
+         ${K.familia?`<div class="fam"><div class="tarj"><div class="num" style="color:var(--ok)">El activo</div><p class="tx">${E(K.familia.activo)}</p></div>
+           <div class="tarj"><div class="num">El riesgo</div><p class="tx">${E(K.familia.riesgo)}</p></div>
+           <div class="tarj regla"><div class="num" style="color:#fff">La regla</div><p class="tx" style="color:#fff">${E(K.familia.regla)}</p></div></div>`:''}
+         <div style="margin-top:8px">${K.palancas.map((p,i)=>`<div class="pilar"><div class="n">${String(i+1).padStart(2,'0')}</div><div><h3>${E(p.t)}</h3><p class="tx">${E(p.x)}</p>${p.dato?`<span class="dato" style="max-width:62ch"><b>El dato</b>${E(p.dato)}</span>`:''}<div>${refs(D2,p.refs,null,p.oficio)}</div></div>
+           <div class="como"><h4>Cómo se hace</h4><ul>${(p.como||[]).map(x=>`<li>${E(x)}</li>`).join('')}</ul></div></div>`).join('')}</div>
+         ${(K.no||[]).length?`<div class="tarj" style="margin-top:16px"><div class="num">Lo que no hay que hacer</div><ul class="lista">${K.no.map(x=>`<li>${E(x)}</li>`).join('')}</ul></div>`:''}`);
+      CONF_REFS=RC; }
 
     if((D.pilares||[]).length) h+=sec(N(),'Los pilares','Lo que sostiene la estrategia durante el año. Cada uno dice de qué principio sale.',
       `<div>${D.pilares.map((p,i)=>`<div class="pilar"><div class="n">${String(i+1).padStart(2,'0')}</div><div><h3>${E(p.t)}</h3><p class="tx">${E(p.x)}</p><div>${refs(D,p.refs,p.principio,p.oficio)}</div></div>
@@ -180,7 +204,7 @@
   }
   /* referencia completa al pasar sobre la etiqueta */
   document.addEventListener('mousemove', async ev=>{ const r=ev.target.closest && ev.target.closest('.ref[data-ref]'); if(!r){ NL.tip(null); return; }
-    const D=await trae(NL.ambito()); const x=(D&&D.refs||[]).find(y=>y.id===r.dataset.ref); if(x) NL.tip(`<b>${E(x.corto||x.id)}</b><div class="m" style="margin-top:4px">${E(x.texto||'')}</div>`, ev); });
+    const D=await trae(NL.ambito()); const x=(D&&D.refs||[]).find(y=>y.id===r.dataset.ref)||CONF_REFS[r.dataset.ref]; if(x) NL.tip(`<b>${E(x.corto||x.id)}</b><div class="m" style="margin-top:4px">${E(x.texto||'')}</div>`, ev); });
   document.addEventListener('click', ev=>{ const b=ev.target.closest && ev.target.closest('[data-ir]'); if(b){ NL.setAmbito(b.dataset.ir); scrollTo({top:0}); } });
   NL.alCambiarAmbito(()=>pinta());
   await pinta();
