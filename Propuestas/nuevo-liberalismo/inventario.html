@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>01 · El inventario — Nuevo Liberalismo rumbo a 2027</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="base.css?v=20261110i">
+<style>
+  .controles{display:grid;gap:14px;margin:6px 0 18px}
+  .controles .fila{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .controles .eti{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);width:74px;padding-top:9px;flex:none}
+  .pill .pt{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:0}
+  .pill.on .pt{outline:1.5px solid rgba(255,255,255,.85)}
+  .pill.par.on{background:var(--card2);border-color:var(--ink);color:var(--ink)}
+  .pill.mini{font-size:.74rem;padding:5px 11px}
+  .mapa-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:stretch}
+  @media(max-width:980px){.mapa-grid{grid-template-columns:minmax(0,1fr)}}
+  #mapa{height:680px;background:transparent;border-radius:var(--r)}
+  @media(max-width:980px){#mapa{height:520px}}
+  .mapa-caja{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:6px}
+  .leaflet-container{background:transparent;font-family:var(--hn)}
+  .leaflet-interactive{cursor:pointer}
+  .leaflet-control-zoom a{background:var(--bg2)!important;color:var(--ink)!important;border-color:var(--line2)!important}
+  .mapa-ley{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 10px 6px;font-size:.76rem;color:var(--ink2)}
+  .mapa-ley .esc{display:flex;align-items:center;gap:4px 0;flex-wrap:wrap}
+  .mapa-ley .esc i{display:inline-block;width:34px;height:11px;margin:0 1px 0 0}
+  .mapa-ley .esc .pz{white-space:nowrap;margin-right:12px;display:inline-flex;align-items:center;gap:6px}
+  .mapa-ley .mk{display:inline-block;width:16px;height:11px;margin-right:6px;vertical-align:-1px;box-sizing:border-box}
+  .lado{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+  .lado .panel{flex:1;min-height:0;display:flex;flex-direction:column}
+  .lado h3{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .scroll{overflow:auto;max-height:560px;margin:0 -8px;padding:0 8px}
+  table.t td.n{max-width:230px}
+  table.t tr.clic{cursor:pointer}
+  table.t td small{color:var(--mute);display:block;font-size:.72rem;line-height:1.25}
+  .barra{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-right:6px}
+  .chip{display:inline-block;font-size:.66rem;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line2);border-radius:999px;padding:1px 7px;color:var(--ink2);margin-left:6px;white-space:nowrap}
+  .chip.el{border-color:#fff;color:#fff}
+  .chip.est{border-color:rgba(240,192,64,.5);color:var(--warn)}
+  .volver{font:inherit;font-size:.74rem;color:var(--ink2);background:none;border:1px solid var(--line2);border-radius:999px;padding:4px 11px;cursor:pointer}
+  .volver:hover{color:var(--ink);border-color:var(--nl)}
+  .hoy{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+  @media(max-width:980px){.hoy{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .det{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+  @media(max-width:980px){.det{grid-template-columns:minmax(0,1fr)}}
+  .det .scroll{max-height:330px}
+  .k5{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:16px}
+  @media(max-width:980px){.k5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .cargando{padding:60px 0;color:var(--mute);text-align:center}
+  /* legibilidad al proyectar */
+  .kpi .s{font-size:.8rem}
+  .chip{font-size:.72rem}
+  table.t td small{font-size:.8rem}
+  .controles .eti{font-size:.76rem}
+  .mapa-ley{font-size:.84rem!important;gap:8px 20px!important;padding:12px 12px 8px!important}
+  .mapa-ley .tit{width:100%;color:var(--ink);font-weight:500}
+  .mapa-ley .esc i{width:40px;height:12px}
+  /* el mapa se apaga donde no hay nada y se enciende donde está el partido */
+  .mapa-caja{background:#08090c!important;isolation:isolate}  /* sin esto el mapa y sus botones se montan sobre la barra fija */
+  .leaflet-overlay-pane path.brilla{filter:drop-shadow(0 0 5px var(--g,rgba(240,57,45,.7)))}
+  #r30{margin-top:2px}
+  @media(max-width:560px){#mapa{height:430px}.controles .eti{width:100%;padding-top:0}.lado h3{flex-wrap:wrap}table.t td.n{max-width:none}}
+  ul.met{margin:8px 0 0;padding-left:18px}
+  /* lista propia o coalición: el partido es quisquilloso con esto, así que va en cada fila */
+  .tipo{display:inline-block;font-family:var(--cond);font-stretch:85%;font-size:.76rem;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:2px 8px;margin:3px 0 2px;white-space:nowrap}
+  .tipo.pr{background:var(--nl-solid);color:#fff}
+  .tipo.co{background:transparent;color:#ffd6a0;border:1px solid rgba(255,190,110,.55)}
+  .filtro{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 10px}
+  .reparto{font-size:.86rem;color:var(--ink2);margin:0 0 8px}
+  .reparto b{color:#fff}
+  .ojo{font-size:.84rem;color:var(--ink2);background:rgba(255,190,110,.06);border:1px solid rgba(255,190,110,.3);border-radius:8px;padding:10px 14px;margin:0 0 16px}
+  .ojo b{color:#ffd6a0}
+  #mapabog{height:640px;background:transparent;border-radius:var(--r)}
+  @media(max-width:980px){#mapabog{height:480px}}
+  @media(max-width:560px){#mapabog{height:400px}}
+  ul.met li{margin:5px 0}
+</style>
+</head>
+<body>
+<div id="nl-nav"></div>
+
+<main class="wrap">
+  <header class="hero">
+    <div class="kick">01 · El inventario · <span class="amb-rot"></span></div>
+    <h1 id="h1">Bogotá pone casi la mitad de los votos. Afuera, el partido está en <em>185</em> municipios.</h1>
+    <p class="lead" id="lead">El partido existe donde tiene a alguien elegido. Este mapa muestra dónde saca votos, dónde eligió y con qué lista.</p>
+  </header>
+  <div class="r30" id="r30"></div>
+
+  <section class="sec" data-en="bogota" id="secbog">
+    <h2>Bogotá, localidad por localidad</h2>
+    <p class="sub">En Bogotá el partido compite en el Concejo, en las 20 juntas administradoras locales y en la Cámara. El mapa va girado, como se acostumbra a ver la ciudad: el norte queda a la izquierda.</p>
+    <div class="grid k5" id="bkpis"></div>
+    <div class="controles"><div class="fila"><span class="eti">Ver</span><div class="pills" id="bcapa"></div></div></div>
+    <div class="mapa-grid">
+      <div class="mapa-caja"><div id="mapabog"><div class="cargando">Cargando el mapa…</div></div><div class="mapa-ley" id="bley"></div></div>
+      <div class="lado"><div class="panel" id="blado"></div></div>
+    </div>
+  </section>
+
+  <section class="sec" data-en="general resto">
+    <h2>Dónde está cada partido</h2>
+    <p class="sub">Elige una elección y toca un partido: se iluminan los municipios donde sacó votos. Más intenso es más porcentaje; el borde blanco marca dónde además eligió.</p>
+
+    <div class="controles">
+      <div class="fila"><span class="eti">Elección</span><div class="pills" id="capas"></div></div>
+      <div class="fila"><span class="eti">Partido</span><div class="pills" id="partidos"></div></div>
+      <div class="fila" id="fila-rel" style="display:none"><span class="eti"></span>
+        <div><button class="pill mini" id="btn-rel"></button>
+        <span class="nota" id="nota-rel" style="display:inline;margin-left:10px"></span></div></div>
+    </div>
+
+    <div class="grid k5" id="kpis"></div>
+    <div class="aviso" id="aviso-capa" style="display:none;margin-bottom:16px"></div>
+
+    <div class="mapa-grid">
+      <div class="mapa-caja">
+        <div id="mapa"><div class="cargando">Cargando el mapa…</div></div>
+        <div class="mapa-ley" id="leyenda"></div>
+      </div>
+      <div class="lado">
+        <div class="panel" id="lado"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2>Lo que tiene hoy el Nuevo Liberalismo · <span class="amb-rot"></span></h2>
+    <p class="sub">Cargos de elección popular con el aval del partido, solo o en una coalición que lo nombra. Los congresistas son la bancada oficial; lo demás sale del resultado de 2023.</p>
+    <div class="ojo"><b>Lista propia o coalición.</b> Cada fila dice si la curul salió de una lista inscrita solo por el partido o de una coalición, según el nombre inscrito de la lista. En una coalición la Registraduría no dice a qué partido pertenece cada elegido: la curul es de la lista y algunas pueden ser del aliado. Concejo, asamblea y ediles son curules estimadas con el artículo 263 sobre el consolidado por mesa, no la declaratoria oficial.</div>
+    <div class="hoy" id="hoy"></div>
+    <div class="lectura" id="lectura" style="margin-top:22px"></div>
+    <div class="det" id="det"></div>
+  </section>
+
+  <section class="sec">
+    <h2>Cómo se hizo y qué no dice</h2>
+    <div class="nota" id="metodo"></div>
+  </section>
+
+  <section class="sec"><div class="implica" id="implica"></div></section>
+
+  <div id="nl-pasos"></div>
+  <footer class="pie">Presentación elaborada con datos públicos, sin vínculo oficial con el partido. Datos: Registraduría Nacional del Estado Civil, Senado, Cámara de Representantes y DANE.</footer>
+</main>
+
+<script src="vendor/leaflet.js"></script>
+<script src="base.js?v=20261110i"></script>
+<script>
+(function(){
+  'use strict';
+  const {fmt, pct, mil, esc, tCase, J, tip} = NL;
+  NL.nav('inventario');
+
+  const CAPAS = [
+    {id:'concejo23',  t:'Concejo 2023',  cortes:[.02,.05,.10,.20], electo:'concejales', unidad:'lista'},
+    {id:'asamblea23', t:'Asamblea 2023', cortes:[.02,.05,.10,.20], electo:'diputados',  unidad:'lista'},
+    {id:'alcaldia23', t:'Alcaldía 2023', cortes:[.10,.20,.30,.45], electo:'alcaldes',   unidad:'candidato'},
+    {id:'senado26',   t:'Senado 2026',   cortes:[.02,.05,.10,.20], electo:'curules',    unidad:'lista'},
+    {id:'camara26',   t:'Cámara 2026',   cortes:[.02,.05,.10,.20], electo:'curules',    unidad:'lista'}
+  ];
+  /* Listas que NO nombran al partido pero son de la coalición nacional a la que pertenece.
+     Solo se suman si el usuario lo pide, y siempre marcadas. */
+  const RELACIONADAS = { camara26: { nl:['ahora'], mira:['ahora'], dignidad:['ahora'] } };
+  const PISO_VALIDOS = 5000;      // para el ranking por porcentaje
+  const FONDO = '#0a0b0f', VACIO = '#15171d';
+  const S = { capa:'concejo23', p:'nl', m:null, orden:'pct', rel:false };
+
+  let I = null, mapa = null, capaMun = null, porK = {}, cache = {};
+
+  /* ── utilidades ── */
+  const SIGLAS = {Asi:'ASI', Mais:'MAIS', Aico:'AICO', Mira:'MIRA', Up:'UP', Cr:'CR', Cd:'CD', Msn:'MSN', Cjl:'CJL', Lau:'LAU', Ada:'ADA'};
+  /* La Registraduría escribe los nombres de personas sin tilde. Solo se corrigen formas inequívocas. */
+  const TILDE = {};
+  ('Galán Pachón María Lucía Gómez Rodríguez González Hernán Ramírez Martínez López Pérez Sánchez Díaz Ramón Andrés Jesús José Julián Sebastián '+
+   'Óscar Iván Hernández Fernández Jiménez Gutiérrez Álvarez Suárez Benítez Vásquez Velásquez Márquez Domínguez Méndez Chávez García Sofía Ángela '+
+   'Ángel Mónica Verónica Adrián Rubén Héctor Fabián Martín Germán Nicolás Tomás Joaquín Agustín Simón César Raúl Efraín Elías Matías Inés Belén '+
+   'Rocío Ávila Álvaro Ríos Cárdenas Vélez Narváez Arévalo Beltrán León Mejía Rincón Flórez Bohórquez Guzmán Peláez Benjamín Víctor Darío '+
+   'Núñez Ibáñez Ordóñez Zúñiga Valentín Marín Moisés Lucía Patiño Séptima Caquetá')
+    .split(' ').forEach(w=>{ TILDE[w.normalize('NFD').replace(/\u0301/g,'').normalize('NFC')] = w; });
+  const tilda = s => s.replace(/\p{L}+/gu, w=>TILDE[w]||w);
+  const persona = s => tilda(tCase(String(s||'')));   // nombres de personas: sin tocar siglas (hay apellidos Mira y Lara)
+  const bonito = s => tCase(String(s||'').replace(/"/g,'')).replace(/\b(Asi|Mais|Aico|Mira|Up|Cr|Cd|Msn|Cjl|Lau|Ada)\b/g, m=>SIGLAS[m]).replace(/D\.c\.?/g,'D.C.').replace(/\bDe la u\b/gi,'de la U').replace(/ U$/,' U');
+  const bonitoT = s => tilda(bonito(s));
+  const hex = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+  const mezcla = (a,b,t) => { const A=hex(a), B=hex(b); return '#'+A.map((x,i)=>Math.round(B[i]+(x-B[i])*t).toString(16).padStart(2,'0')).join(''); };
+  /* un solo tono, de apagado a encendido: el último paso va un poco más claro que el color del partido para que «brille» */
+  const rampa = c => [mezcla(c,FONDO,.30), mezcla(c,FONDO,.48), mezcla(c,FONDO,.68), mezcla(c,FONDO,.88), mezcla('#ffffff',c,.28)];
+  const capaDef = id => CAPAS.find(c=>c.id===id);
+  const pctTxt = v => pct(v, v<.1?1:0);
+
+  /* ── el cálculo central: un partido en una capa ── */
+  const BOG = '16001';
+  function calc(capaId, key, rel, amb){
+    amb = amb || NL.ambito();
+    const sinBog = amb==='resto';                       /* «Resto del país»: todo menos Bogotá */
+    const ck = capaId+'|'+key+'|'+(rel?1:0)+'|'+(sinBog?'r':'g');
+    if(cache[ck]) return cache[ck];
+    const c = I.capas[capaId], relKeys = (rel && RELACIONADAS[capaId] && RELACIONADAS[capaId][key]) || [];
+    const mun = {}; let votos=0, propios=0, coal=0, relac=0, total=0, electos=0, munEl=0, nProp=0, nCoal=0, nRel=0;
+    const listas = {};
+    for(const k in c.m){
+      if(sinBog && k===BOG) continue;
+      const m = c.m[k]; total += m.v;
+      let v=0, o=0, cl=0, rl=0, el=0, nombres=[];
+      for(const l of m.l){
+        const ks = c.key[l[0]];
+        let tipo = null;
+        if(ks.includes(key)) tipo = (ks.length===1 || (key==='ahora' && ks[0]==='ahora')) ? 'p' : 'c';
+        else if(relKeys.some(r=>ks.includes(r))) tipo = 'r';
+        if(!tipo) continue;
+        v += l[1]; if(tipo==='p') o+=l[1]; else if(tipo==='c') cl+=l[1]; else rl+=l[1];
+        if(capaId==='concejo23' && l[2]) el += l[2];
+        if(capaId==='alcaldia23' && l[2]) el += 1;
+        nombres.push(l[0]); listas[l[0]] = (listas[l[0]]||0) + l[1];
+      }
+      if(v>0){
+        mun[k] = {v, o, cl, rl, el, s: m.v ? v/m.v : 0, li: nombres};
+        votos+=v; propios+=o; coal+=cl; relac+=rl; electos+=el; if(el) munEl++;
+        if(o>0) nProp++; else if(cl>0) nCoal++; else nRel++;
+      }
+    }
+    let dip = 0, dipDeps = 0;
+    if(capaId==='asamblea23'){
+      for(const dd in c.dep){ let s=0; for(const l of c.dep[dd].l){ if(c.key[l[0]].includes(key)) s+=l[2]; } if(s){ dip+=s; dipDeps++; } }
+    }
+    const ks = Object.keys(mun);
+    const tope = ks.reduce((a,k)=> (!a || mun[k].v>mun[a].v) ? k : a, null);
+    return cache[ck] = {mun, votos, propios, coal, relac, total, electos, munEl, n:ks.length, nProp, nCoal, nRel, dip, dipDeps, tope, listas,
+                        nCapa:Object.keys(c.m).length - (sinBog && c.m[BOG] ? 1 : 0)};
+  }
+
+  /* partidos con datos en la capa, ordenados por votos (una lista cuenta para cada partido que nombra) */
+  function partidosDe(capaId){
+    const c = I.capas[capaId], tot = {};
+    for(const k in c.m) for(const l of c.m[k].l) for(const key of c.key[l[0]]) tot[key] = (tot[key]||0) + l[1];
+    const ks = Object.keys(tot).filter(k=>k!=='otros' && NL.PARTIDOS[k]).sort((a,b)=>tot[b]-tot[a]);
+    const i = ks.indexOf('nl'); if(i>0){ ks.splice(i,1); ks.unshift('nl'); }
+    if(tot.otros) ks.push('otros');
+    return {ks, tot};
+  }
+  const nombreP = k => k==='otros' ? 'Sin partido en el nombre' : NL.nombre(k);
+
+  /* ── controles ── */
+  function pintaControles(){
+    document.getElementById('capas').innerHTML = CAPAS.map(c=>`<button class="pill ${c.id===S.capa?'on':''}" data-capa="${c.id}">${c.t}</button>`).join('');
+    const {ks} = partidosDe(S.capa);
+    if(!ks.includes(S.p)) S.p = ks[0];
+    document.getElementById('partidos').innerHTML = ks.map(k=>`<button class="pill par ${k===S.p?'on':''}" data-p="${k}"><span class="pt" style="background:${NL.color(k)}"></span>${esc(nombreP(k))}</button>`).join('');
+    const rel = RELACIONADAS[S.capa] && RELACIONADAS[S.capa][S.p];
+    const fila = document.getElementById('fila-rel');
+    fila.style.display = rel ? '' : 'none';
+    if(rel){
+      const b = document.getElementById('btn-rel');
+      b.className = 'pill mini' + (S.rel?' on':''); b.textContent = (S.rel?'✓ ':'+ ') + 'Sumar las listas de Ahora Colombia';
+      document.getElementById('nota-rel').innerHTML = 'Ahora Colombia es la coalición con la que el partido fue al Senado. A la Cámara esa lista existe en varios departamentos, pero su nombre no dice qué partidos la integran en cada uno.';
+    } else S.rel = false;
+  }
+  document.addEventListener('click', e=>{
+    const a = e.target.closest('[data-capa]'); if(a){ S.capa=a.dataset.capa; S.m=null; todo(); return; }
+    const b = e.target.closest('[data-p]');    if(b){ S.p=b.dataset.p; todo(); return; }
+    const o = e.target.closest('[data-orden]');if(o){ S.orden=o.dataset.orden; pintaLado(); return; }
+    const r = e.target.closest('[data-k]');    if(r){ elige(r.dataset.k, true); return; }
+    if(e.target.closest('#btn-rel')){ S.rel=!S.rel; todo(); return; }
+    if(e.target.closest('#btn-volver')){ S.m=null; estilos(); pintaLado(); guarda(); return; }
+  });
+
+  /* ── KPI ── */
+  function pintaKPI(){
+    const d = calc(S.capa, S.p, S.rel), def = capaDef(S.capa), nom = nombreP(S.p);
+    const tiles = [];
+    const sub1 = [d.nProp?`${fmt(d.nProp)} con ${def.unidad==='candidato'?'aval propio':'lista propia'}`:'', d.nCoal?`${fmt(d.nCoal)} solo en coalición`:'', d.nRel?`${fmt(d.nRel)} solo con Ahora Colombia`:''].filter(Boolean).join(' · ');
+    tiles.push({v:fmt(d.n), l:`municipios${S.capa.endsWith('26')?' y consulados':''} con votos, de ${fmt(d.nCapa)}`, s:sub1});
+    tiles.push({v:mil(d.votos), l:`votos (${pctTxt(d.total?d.votos/d.total:0)} ${NL.ambito()==='resto'?'de los válidos fuera de Bogotá':'del país'})`, s:`${fmt(d.votos)} sobre ${fmt(d.total)} válidos`});
+    if(S.capa==='concejo23') tiles.push({v:fmt(d.electos), l:'concejales, estimado', s:`en ${fmt(d.munEl)} municipios`, est:1});
+    else if(S.capa==='asamblea23') tiles.push({v:fmt(d.dip), l:'diputados, estimado', s:d.dipDeps?`en ${fmt(d.dipDeps)} departamentos`:'sin curul', est:1});
+    else if(S.capa==='alcaldia23') tiles.push({v:fmt(d.electos), l:'alcaldes elegidos', s:`de ${fmt(d.n)} municipios donde avaló`});
+    else {
+      const b = (I.bancada26[S.capa]||{})[S.p], li = (I.porlista26[S.capa]||{})[S.p];
+      if(b!=null) tiles.push({v:fmt(b), l:(b===1?'curul':'curules')+', bancada oficial', s: (li!=null && li!==b) ? `las listas que lo nombran eligieron ${fmt(li)}` : 'según el registro de la corporación'});
+      else tiles.push({v:fmt(li||0), l:'curules de la lista', s:'elegidos por listas que lo nombran'});
+    }
+    const t = d.tope ? I.mun[d.tope] : null;
+    tiles.push({v: d.votos ? pct(d.mun[d.tope].v/d.votos,0) : '—', l: t ? `de sus votos sale de ${bonito(t.n)}` : 'sin votos', s:'qué tanto depende de un solo municipio'});
+    const ss = Object.values(d.mun).map(x=>x.s).sort((a,b)=>a-b);
+    tiles.push({v: ss.length ? pctTxt(ss[Math.floor((ss.length-1)/2)]) : '—', l:'porcentaje típico donde compite', s:'mediana entre los municipios con votos'});
+    document.getElementById('kpis').innerHTML = tiles.map((x,i)=>`<div class="kpi"><div class="v ${i===0&&S.p==='nl'?'nl':''}">${x.v}</div><div class="l">${esc(x.l)}${x.est?'<span class="chip est">estimado</span>':''}</div><div class="s">${esc(x.s||'')}</div></div>`).join('');
+
+    /* aviso propio de la capa */
+    const c = I.capas[S.capa]; let otros = 0;
+    for(const k in c.m) for(const l of c.m[k].l) if(c.key[l[0]][0]==='otros') otros += l[1];
+    const av = document.getElementById('aviso-capa'); const partes = [];
+    if(S.capa==='senado26' && ['nl','mira','dignidad','ahora'].includes(S.p)) partes.push('<b>Lista de coalición.</b> Al Senado, el Nuevo Liberalismo, MIRA y Dignidad y Compromiso fueron juntos en «Ahora Colombia». El mapa muestra el voto de esa lista completa: no se puede separar cuánto es de cada partido, salvo por el voto preferente de cada candidato.');
+    if(otros/d.total > .2) partes.push(`<b>Ojo con esta capa.</b> El ${pct(otros/d.total,0)} de los votos fue a ${def.unidad==='candidato'?'candidatos':'listas'} de coalición cuyo nombre no dice qué partidos la integran. Esos votos no se le cuentan a nadie, así que la presencia real de todos los partidos es mayor.`);
+    if(S.p==='otros') partes.push('<b>Sin partido en el nombre.</b> Aquí están los movimientos locales, los grupos por firmas y las coaliciones con nombre genérico.');
+    av.style.display = partes.length ? '' : 'none'; av.innerHTML = partes.join('<br>');
+  }
+
+  /* ── mapa ── */
+  function estiloDe(k){
+    const d = calc(S.capa, S.p, S.rel), x = d.mun[k], def = capaDef(S.capa), col = rampa(NL.color(S.p));
+    const sel = (k===S.m);
+    if(!x) return {fillColor:VACIO, fillOpacity: I.capas[S.capa].m[k] ? .55 : .25, color: sel?'#fff':'rgba(255,255,255,.035)', weight: sel?2.6:.4, dashArray:null};
+    let b = 0; while(b<4 && x.s>=def.cortes[b]) b++;
+    const mixto = d.nProp>0 && (d.nCoal+d.nRel) < d.n*.7;
+    const soloCoal = (x.o===0);
+    if(sel) return {fillColor:col[b], fillOpacity:1, color:'#fff', weight:2.8, dashArray:null};
+    if(x.el) return {fillColor:col[b], fillOpacity:1, color:'rgba(255,255,255,.8)', weight:.9, dashArray:null};
+    if(soloCoal && mixto) return {fillColor:col[b], fillOpacity:1, color:'rgba(255,255,255,.7)', weight:1, dashArray:'3 3'};
+    return {fillColor:col[b], fillOpacity:1, color:'rgba(6,8,16,.55)', weight:.4, dashArray:null};
+  }
+  function estilos(){
+    if(!capaMun) return;
+    const frente = [];
+    const d = calc(S.capa, S.p, S.rel), g = NL.color(S.p);
+    capaMun.eachLayer(l=>{ const k=l.feature.properties.k, st=estiloDe(k); l.setStyle(st); if(st.weight>1 || (d.mun[k] && d.mun[k].el)) frente.push(l);
+      const el=l.getElement(); if(el){ const on=!!(d.mun[k] && d.mun[k].el); el.classList.toggle('brilla', on); if(on) el.style.setProperty('--g', g); } });
+    frente.forEach(l=>l.bringToFront());
+    if(S.m && porK[S.m]) porK[S.m].bringToFront();
+    pintaLeyenda();
+  }
+  function pintaLeyenda(){
+    const def = capaDef(S.capa), col = rampa(NL.color(S.p)), c = def.cortes, d = calc(S.capa,S.p,S.rel);
+    const r = [`menos de ${c[0]*100} %`, `${c[0]*100}-${c[1]*100} %`, `${c[1]*100}-${c[2]*100} %`, `${c[2]*100}-${c[3]*100} %`, `${c[3]*100} % o más`];
+    const mixto = d.nProp>0 && (d.nCoal+d.nRel) < d.n*.7 && (d.nCoal+d.nRel)>0;
+    const eleg = S.capa==='concejo23' ? 'eligió al menos un concejal (estimado)' : S.capa==='alcaldia23' ? 'ganó la alcaldía' : null;
+    document.getElementById('leyenda').innerHTML =
+      `<span class="tit">${esc(nombreP(S.p))} · ${esc(def.t)} · porcentaje de los votos válidos del municipio</span>
+       <span class="esc">${col.map((x,i)=>`<span class="pz"><i style="background:${x}"></i>${r[i]}</span>`).join('')}</span>
+       <span><i class="mk" style="background:${VACIO};border:1px solid rgba(255,255,255,.12)"></i>sin votos (apagado)</span>
+       ${eleg?`<span><i class="mk" style="background:${col[3]};border:1.6px solid #fff;box-shadow:0 0 6px ${NL.color(S.p)}"></i>${eleg}</span>`:''}
+       ${mixto?`<span><i class="mk" style="background:${col[2]};border:1.2px dashed rgba(255,255,255,.8)"></i>solo en coalición</span>`:''}
+       ${NL.ambito()==='resto'?'<span style="color:var(--mute)">Bogotá queda fuera de esta vista: está en el ámbito Bogotá</span>':''}`;
+  }
+  function tooltipDe(k, ev){
+    const m = I.mun[k] || {n:k, d:''}, c = I.capas[S.capa], cm = c.m[k], d = calc(S.capa,S.p,S.rel), x = d.mun[k];
+    let h = `<b>${esc(bonito(m.n))}</b> <span class="m">· ${esc(bonito(m.d))}</span><br>`;
+    if(!cm){ h += `<span class="m">Sin datos de ${esc(capaDef(S.capa).t)}</span>`; return tip(h, ev); }
+    if(x){
+      h += `${esc(nombreP(S.p))}: <b>${pctTxt(x.s)}</b> · ${fmt(x.v)} votos`;
+      if(x.o===0) h += ` <span class="m">(${x.cl? 'en coalición' : 'lista de Ahora Colombia'})</span>`;
+      if(S.capa==='concejo23' && x.el) h += `<br>${x.el} ${x.el===1?'concejal':'concejales'} de ${cm.s} <span class="m">estimado</span>`;
+      if(S.capa==='alcaldia23' && x.el) h += `<br>Ganó la alcaldía`;
+    } else h += `<span class="m">${esc(nombreP(S.p))}: sin votos aquí</span>`;
+    h += `<div class="m" style="margin-top:6px">Los primeros allí</div>`;
+    h += cm.l.slice(0,3).map(l=>`${(S.capa==='alcaldia23' ? esc(persona(l[3])) : esc(bonito(c.nom[l[0]])))} <span class="m">${pct(l[1]/cm.v,0)}</span>`).join('<br>');
+    tip(h, ev);
+  }
+  function creaMapa(geo, deps){
+    const el = document.getElementById('mapa'); el.innerHTML = '';
+    mapa = L.map(el, {zoomControl:true, attributionControl:false, zoomSnap:.25, zoomDelta:.5, minZoom:4.5, maxZoom:11, scrollWheelZoom:false});
+    mapa.setView([4.4,-73.2], 5.5);
+    capaMun = L.geoJSON(geo, {
+      style: f=>estiloDe(f.properties.k),
+      onEachFeature: (f,l)=>{
+        porK[f.properties.k] = l;
+        l.on('mousemove', e=>tooltipDe(f.properties.k, e.originalEvent));
+        l.on('mouseout', ()=>tip(null));
+        l.on('click', ()=>elige(f.properties.k, false));
+      }
+    }).addTo(mapa);
+    mapa.createPane('deps'); mapa.getPane('deps').style.zIndex = 450; mapa.getPane('deps').style.pointerEvents = 'none';
+    L.geoJSON(deps, {pane:'deps', interactive:false, style:{fill:false, color:'rgba(255,255,255,.30)', weight:.9}}).addTo(mapa);
+    const encuadra = ()=>{ mapa.invalidateSize(); if(!S.m) mapa.fitBounds([[-4.3,-79.3],[12.7,-66.7]], {animate:false, padding:[4,4]}); };
+    setTimeout(encuadra, 0);
+    if(window.ResizeObserver) new ResizeObserver(()=>mapa.invalidateSize()).observe(el);
+    mapa.on('click', ()=>mapa.scrollWheelZoom.enable());
+  }
+  function elige(k, acercar){
+    S.m = k; estilos(); pintaLado(); guarda();
+    const l = porK[k];
+    if(l && acercar && mapa){ const b = l.getBounds(); mapa.fitBounds(b.pad(2.2), {animate:false, maxZoom:9}); }
+  }
+
+  /* ── panel lateral: ranking o ficha ── */
+  function pintaLado(){
+    const el = document.getElementById('lado');
+    if(S.m) return el.innerHTML = fichaHTML(S.m);
+    const d = calc(S.capa,S.p,S.rel), c = I.capas[S.capa], col = NL.color(S.p);
+    let filas = Object.keys(d.mun).map(k=>({k, ...d.mun[k], val:c.m[k].v}));
+    if(S.orden==='pct') filas = filas.filter(x=>x.val>=PISO_VALIDOS).sort((a,b)=>b.s-a.s);
+    else filas.sort((a,b)=>b.v-a.v);
+    filas = filas.slice(0,15);
+    const max = S.orden==='pct' ? (filas[0]||{}).s : (filas[0]||{}).v;
+    el.innerHTML = `<h3><span>Dónde es más fuerte · ${esc(nombreP(S.p))}</span>
+        <span class="pills"><button class="pill mini ${S.orden==='pct'?'on':''}" data-orden="pct">Por %</button><button class="pill mini ${S.orden==='votos'?'on':''}" data-orden="votos">Por votos</button></span></h3>
+      <div class="scroll"><table class="t"><thead><tr><th>Municipio</th><th class="r">%</th><th class="r">Votos</th></tr></thead><tbody>
+      ${filas.map(x=>{ const m=I.mun[x.k]||{n:x.k,d:''}; const w=Math.max(3, Math.round(70*(S.orden==='pct'?x.s:x.v)/max));
+        return `<tr class="clic" data-k="${x.k}"><td class="n">${esc(bonito(m.n))}${x.el?`<span class="chip el">${S.capa==='alcaldia23'?'ganó':x.el+' elegidos'}</span>`:''}${x.o===0?'<span class="chip">coalición</span>':''}<small>${esc(bonito(m.d))}</small></td>
+          <td class="r"><span class="barra" style="width:${w}px;background:${col}"></span>${pctTxt(x.s)}</td><td class="r">${fmt(x.v)}</td></tr>`; }).join('') || '<tr><td colspan="3" style="color:var(--mute)">Sin votos en esta elección.</td></tr>'}
+      </tbody></table></div>
+      <p class="nota" style="margin:10px 0 0">${S.orden==='pct' ? `Solo municipios con ${fmt(PISO_VALIDOS)} votos válidos o más, para que no gane uno de 300 electores.` : 'Todos los municipios.'} Toca una fila o un municipio del mapa para ver su ficha.</p>`;
+  }
+  function fichaHTML(k){
+    const m = I.mun[k] || {n:k,d:''}, c = I.capas[S.capa], cm = c.m[k], def = capaDef(S.capa);
+    let h = `<h3><span>${esc(bonito(m.n))} <span style="color:var(--mute);font-weight:400">· ${esc(bonito(m.d))}</span></span><button class="volver" id="btn-volver">← Ranking</button></h3>`;
+    if(!cm) return h + `<p class="nota">Sin datos de ${esc(def.t)} en este municipio.${S.capa==='asamblea23'&&k.slice(0,2)==='16'?' Bogotá es Distrito Capital y no tiene asamblea.':''}</p>`;
+    const x = calc(S.capa,S.p,S.rel).mun[k];
+    h += `<p class="nota" style="margin:0 0 10px">${esc(def.t)} · ${fmt(cm.v)} votos válidos${m.p?` · ${fmt(m.p)} habitantes (DANE 2023)`:''}${S.capa==='concejo23'&&cm.s?(k==='16001'?` · 45 curules: 44 por cifra repartidora y 1 del Estatuto de la Oposición`:` · ${cm.s} curules <span class="chip est">estimado</span>`):''}</p>`;
+    if(S.capa==='asamblea23'){
+      const dep = c.dep[k.slice(0,2)];
+      if(dep){ const con = dep.l.filter(l=>l[2]>0);
+        h += `<p class="nota" style="margin:0 0 10px"><b>Asamblea de ${esc(bonito(dep.n))}, ${dep.s} curules (estimado):</b> ${con.map(l=>`${esc(bonito(c.nom[l[0]]))} ${l[2]}`).join(' · ')}${dep.op?' · 1 del Estatuto de la Oposición':''}.</p>`; }
+    }
+    const esAlc = S.capa==='alcaldia23';
+    h += `<div class="scroll"><table class="t"><thead><tr><th>${esAlc?'Candidato y aval':'Lista'}</th><th class="r">%</th><th class="r">Votos</th>${S.capa==='concejo23'?'<th class="r">Curules</th>':''}</tr></thead><tbody>`;
+    h += cm.l.map(l=>{
+      const marca = c.key[l[0]].includes(S.p) || (x && x.li.includes(l[0]));
+      return `<tr class="${marca?'nl':''}"><td class="n">${esAlc?`${esc(persona(l[3]))}${l[2]?'<span class="chip el">ganó</span>':''}<small>${esc(bonito(c.nom[l[0]]))}</small>`:esc(bonito(c.nom[l[0]]))}</td>
+        <td class="r">${pctTxt(l[1]/cm.v)}</td><td class="r">${fmt(l[1])}</td>${S.capa==='concejo23'?`<td class="r">${l[2]||'—'}</td>`:''}</tr>`; }).join('');
+    const bl = cm.v - cm.l.reduce((a,l)=>a+l[1],0);
+    h += `<tr><td class="n" style="color:var(--mute)">Voto en blanco</td><td class="r">${pctTxt(bl/cm.v)}</td><td class="r">${fmt(bl)}</td>${S.capa==='concejo23'?'<td></td>':''}</tr></tbody></table></div>`;
+    return h;
+  }
+
+  /* ── lista propia o coalición ── */
+  /* Aliados que nombra una lista, sacados de su nombre inscrito (el orden importa: lo largo antes de lo corto). */
+  const ALIADOS = [[/AHORA COLOMBIA/,'MIRA'],[/AHORA COLOMBIA/,'Dignidad y Compromiso'],[/EN MARCHA/,'En Marcha'],[/ALIANZA VERDE/,'Alianza Verde'],[/JUSTA LIBRES/,'Colombia Justa Libres'],[/\bMIRA\b/,'MIRA'],
+    [/DIGNIDAD/,'Dignidad y Compromiso'],[/COLOMBIA RENACIENTE/,'Colombia Renaciente'],[/CAMBIO RADICAL|\bRADICAL\b/,'Cambio Radical'],
+    [/CONSERVADOR/,'Partido Conservador'],[/\bLA U\b|PARTIDO DE LA U|PARTIDOS DE LA U/,'Partido de la U']];
+  const aliados = lista => { const n = NL.norm(lista); return [...new Set(ALIADOS.filter(([r])=>r.test(n)).map(a=>a[1]))]; };
+  const tipoTxt = (lista, coal) => coal ? ('Coalición' + (aliados(lista).length ? ' con ' + aliados(lista).join(', ') : '')) : 'Lista propia';
+  const tipoHTML = (lista, coal) => `<span class="tipo ${coal?'co':'pr'}">${esc(tipoTxt(lista, coal))}</span>`;
+  const reparto = (filas, palabra) => {        /* «N curules en listas del partido: X en lista propia y Y en coalición» */
+    const t = filas.reduce((a,f)=>a+(f.cur||1),0), c = filas.filter(f=>f.coal).reduce((a,f)=>a+(f.cur||1),0);
+    return {t, p:t-c, c, txt:`<b>${fmt(t)}</b> ${palabra} en listas del partido: <b>${fmt(t-c)}</b> en lista propia y <b>${fmt(c)}</b> en coalición`};
+  };
+  S.f = {conc:'todas', dip:'todas', edi:'todas', alc:'todas'};
+  const filtra = (id, filas) => S.f[id]==='propia' ? filas.filter(f=>!f.coal) : S.f[id]==='coal' ? filas.filter(f=>f.coal) : filas;
+  const filtroHTML = id => `<div class="filtro">${[['todas','Todas'],['propia','Lista propia'],['coal','Coalición']].map(([k,t])=>`<button class="pill mini ${S.f[id]===k?'on':''}" data-f="${id}" data-fv="${k}">${t}</button>`).join('')}</div>`;
+  document.addEventListener('click', e=>{ const b=e.target.closest('[data-f]'); if(!b) return; S.f[b.dataset.f]=b.dataset.fv; pintaHoy(); });
+
+  /* Concejo de Bogotá: verificado en fuente oficial (consulta del 10-nov-2026) */
+  const BOG_CONCEJO = {
+    hoy: ['Juan Manuel Díaz Martínez','David Araque Mejía','Ricardo Andrés Correa Mojica','Cristina Calderón Restrepo','Juan David Quintero Rubio','Fernando López Gutiérrez','David Hernando Saavedra Murcia','Elkin Jwiseb Huertas Carrasquilla'],
+    voceros: ['David Araque Mejía','David Hernando Saavedra Murcia'],
+    f1: 'https://concejodebogota.gov.co/concejo/site/edic/base/port/nuevoliberalismo.php',
+    f2: 'https://bogota.gov.co/mi-ciudad/administracion-distrital/concejo-de-bogota'
+  };
+
+  /* ── bloque: lo que tiene hoy el partido (cambia con el ámbito) ── */
+  function pintaHoy(){
+    const A = NL.ambito(), N = I.nl, R = I.resumen;
+    const t = (v,l,s,est)=>`<div class="kpi"><div class="v nl">${v}</div><div class="l">${l}${est?'<span class="chip est">estimado</span>':''}</div><div class="s">${s}</div></div>`;
+    const enA = f => A==='bogota' ? f.k===BOG : A==='resto' ? f.k!==BOG : true;
+    const conc = N.concejales.filter(enA), alc = N.alcaldes.filter(enA);
+    const rc = reparto(conc,'curules'), rd = reparto(N.diputados,'curules'), re_ = reparto(N.ediles,'curules');
+    const ra = {t:alc.length, c:alc.filter(a=>a.coal).length}; ra.p = ra.t - ra.c;
+    const sen = N.congreso.filter(c=>c.corp==='Senado').length, cam = N.congreso.length - sen;
+    const cj = calc('concejo23','nl',false,'general'), cm = calc('camara26','nl',false,'general'), ss = calc('senado26','nl',false,'general'), al = calc('alcaldia23','nl',false,'general');
+    let tiles = '';
+    if(A==='general') tiles =
+      t(fmt(R.congresistas), 'congresistas 2026-2030', `${sen} en Senado · ${cam} en Cámara, todos por listas de coalición`) +
+      t(fmt(ra.t), 'alcaldes elegidos en 2023', `${ra.p} con aval propio · ${ra.c} en coalición · incluye Bogotá`) +
+      t(fmt(rd.t), 'curules de asamblea 2023', `${rd.p} lista propia · ${rd.c} coalición · ${R.diputados_deps} asambleas`, 1) +
+      t(fmt(rc.t), 'curules de concejo 2023', `${rc.p} lista propia · ${rc.c} coalición · ${fmt(R.concejales_muns)} municipios`, 1) +
+      t(fmt(re_.t), 'curules de edil en Bogotá 2023', `${re_.p} lista propia · ${re_.c} coalición · de ${fmt(R.ediles_de)}`, 1);
+    else if(A==='bogota'){
+      const b = cj.mun[BOG], c26 = cm.mun[BOG], s26 = ss.mun[BOG], a = al.mun[BOG];
+      tiles =
+        t(`${b.el} de 45`, 'curules en el Concejo 2023', `lista en coalición con En Marcha · ${pctTxt(b.s)} · verificado en fuente oficial`) +
+        t(pct(a.s,0), 'Galán, alcalde 2024-2027', `${fmt(a.v)} votos · aval propio`) +
+        t(fmt(re_.t), 'curules de edil 2023', `${re_.p} lista propia · ${re_.c} coalición · de ${fmt(R.ediles_de)}`, 1) +
+        t(fmt(c26.o), 'votos a la Cámara 2026', `lista propia · ${pctTxt(c26.o/I.capas.camara26.m[BOG].v)} · sin curul`) +
+        t(fmt(s26.v), 'votos de Ahora Colombia al Senado', `${pctTxt(s26.s)} en Bogotá · coalición con MIRA y Dignidad`);
+    } else {
+      const fueraCam = cm.propios - (cm.mun[BOG]||{o:0}).o;
+      tiles =
+        t(fmt(cam), 'representantes 2026-2030', `por listas de coalición departamentales · y ${sen} senadora de lista nacional`) +
+        t(fmt(ra.t), 'alcaldes fuera de Bogotá', `${ra.p} con aval propio · ${ra.c} en coalición`) +
+        t(fmt(rd.t), 'curules de asamblea 2023', `${rd.p} lista propia · ${rd.c} coalición · ${R.diputados_deps} asambleas`, 1) +
+        t(fmt(rc.t), 'curules de concejo 2023', `${rc.p} lista propia · ${rc.c} coalición · ${fmt(conc.length)} municipios`, 1) +
+        t(mil(fueraCam), 'votos a la Cámara 2026, lista propia', 'fuera de Bogotá · ninguna curul');
+    }
+    document.getElementById('hoy').innerHTML = tiles;
+
+    /* lectura corta según el ámbito */
+    const bogC = (cj.mun[BOG]||{v:0}).v, bogA = (al.mun[BOG]||{v:0}).v, bogCam = (cm.mun[BOG]||{o:0}).o;
+    const unos = N.concejales.filter(c=>c.k!==BOG && c.cur===1).length;
+    let lec = '';
+    if(A==='general') lec = `De cada 100 votos que el partido sacó a concejos en 2023, ${Math.round(100*bogC/cj.votos)} salieron de Bogotá; a alcaldías, ${Math.round(100*bogA/al.votos)}. Fuera de la capital, sus listas tienen ${fmt(R.concejales - BOGCUR())} curules de concejo en ${fmt(R.concejales_muns-1)} municipios, y en ${fmt(unos)} de ellos hay una sola. En 2026, con lista propia a la Cámara sacó ${fmt(cm.propios)} votos en todo el país, ${Math.round(100*bogCam/cm.propios)} % en Bogotá, y no le alcanzó para curul.`;
+    else if(A==='bogota') lec = `En Bogotá el partido tiene la alcaldía hasta 2027 y la segunda lista más votada al Concejo, en coalición con En Marcha. En 2026 fue solo a la Cámara y sacó ${fmt(bogCam)} votos, ${Math.round(100*bogCam/bogC)} por cada 100 de la lista al Concejo de 2023, sin curul.`;
+    else lec = `Fuera de Bogotá, sus listas tienen ${fmt(rc.t)} curules de concejo en ${fmt(conc.length)} municipios (${fmt(rc.p)} en lista propia), ${fmt(ra.t)} alcaldías y ${fmt(rd.t)} curules de asamblea. En ${fmt(unos)} municipios depende de una sola curul.`;
+    document.getElementById('lectura').innerHTML = lec + `<small>Concejo, asamblea y ediles son estimados con el reparto del artículo 263 sobre el resultado por mesa; la declaratoria oficial puede diferir. El Concejo de Bogotá está verificado en la fuente oficial.</small>`;
+
+    /* tablas */
+    const tabla = (tit, cab, filas, pie, extra)=>`<div class="panel"${extra||''}><h3>${tit}</h3>${filas.pre||''}<div class="scroll"><table class="t"><thead><tr>${cab.map(c=>`<th class="${c[1]||''}">${c[0]}</th>`).join('')}</tr></thead><tbody>${filas.join('') || `<tr><td colspan="${cab.length}" style="color:var(--mute)">Ninguna con este filtro.</td></tr>`}</tbody></table></div>${pie?`<p class="nota" style="margin:10px 0 0">${pie}</p>`:''}</div>`;
+    const noms = x => x.cerrada ? '<small>lista cerrada: la fuente no trae los nombres</small>' : `<small>${x.nombres.map(n=>esc(persona(n))).join(' · ')}</small>`;
+    const conPre = (arr, pre) => { arr.pre = pre; return arr; };
+    let h = '';
+
+    if(A==='bogota'){
+      const b = N.concejales.find(c=>c.k===BOG);
+      h += `<div class="panel" style="grid-column:1/-1"><h3>Concejo de Bogotá 2024-2027 <span class="chip el">verificado en fuente oficial</span></h3>
+        <p class="reparto">La lista fue <b>${esc(bonito(b.lista))}</b> ${tipoHTML(b.lista,b.coal)}: ${fmt(b.votos)} votos, ${pct(b.pct,1)} y <b>${b.cur} de las 45 curules</b>. Los 8 elegidos de la estimación coinciden nombre a nombre con los publicados por la Alcaldía, y hoy los 8 integrantes están en la bancada del Nuevo Liberalismo en el Concejo.</p>
+        <div class="scroll" style="max-height:none"><table class="t"><thead><tr><th>Concejal hoy</th><th>Bancada</th></tr></thead><tbody>
+        ${BOG_CONCEJO.hoy.map(n=>`<tr><td class="n">${esc(n)}${BOG_CONCEJO.voceros.includes(n)?'<span class="chip">vocero</span>':''}</td><td>Partido Nuevo Liberalismo</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="nota" style="margin:10px 0 0">Respecto a los elegidos en 2023, Juan Javier Baena ya no figura y aparece Elkin Jwiseb Huertas Carrasquilla. Fuentes, consultadas el 10 de noviembre de 2026: <a href="${BOG_CONCEJO.f1}" target="_blank" rel="noopener">bancada del Nuevo Liberalismo, Concejo de Bogotá</a> · <a href="${BOG_CONCEJO.f2}" target="_blank" rel="noopener">concejales elegidos, Alcaldía de Bogotá (1-ene-2024)</a>.</p></div>`;
+    }
+    if(A!=='bogota'){
+      h += tabla('Congresistas 2026-2030 <span class="chip">bancada oficial</span>', [['Nombre'],['Entró por la lista'],['Votos','r']],
+        N.congreso.filter(c=> A==='general' || true).map(c=>`<tr><td class="n">${esc(persona(c.n))}<small>${c.corp}${c.dep&&c.dep!=='NACIONAL'?' · '+esc(bonitoT(c.dep)):''} · Comisión ${esc(bonitoT(c.com))}</small></td><td class="n">${esc(bonito(c.lista))}<br>${tipoHTML(c.lista, true)}</td><td class="r">${fmt(c.votos)}</td></tr>`),
+        'Ninguno de los tres entró por una lista llamada «Nuevo Liberalismo»: dos por Ahora Colombia (MIRA, Nuevo Liberalismo y Dignidad y Compromiso) y uno por una coalición departamental.');
+    }
+    const alcF = filtra('alc', alc);
+    h += tabla('Alcaldes elegidos en 2023', [['Municipio'],['Alcalde y aval'],['%','r'],['Votos','r']],
+      conPre(alcF.map(a=>`<tr class="clic" data-k="${a.k}" data-ir="alcaldia23"><td class="n">${esc(bonito(a.mun))}<small>${esc(bonito(a.dep))}</small></td><td class="n">${esc(persona(a.n))}<br>${tipoHTML(a.aval,a.coal)}${a.coal?`<small>${esc(bonito(a.aval))}</small>`:''}</td><td class="r">${pct(a.pct,0)}</td><td class="r">${fmt(a.votos)}</td></tr>`),
+        `<p class="reparto"><b>${fmt(ra.t)}</b> ${ra.t===1?'alcaldía':'alcaldías'}: <b>${fmt(ra.p)}</b> con aval propio y <b>${fmt(ra.c)}</b> en coalición</p>${A==='bogota'?'':filtroHTML('alc')}`),
+      A==='resto' ? '' : 'Bogotá no se repite en 2027: el alcalde no puede ser reelegido para el periodo siguiente.');
+    if(A!=='bogota'){
+      const dipF = filtra('dip', N.diputados);
+      h += tabla('Diputados 2023 <span class="chip est">estimado</span>', [['Departamento'],['Lista y elegidos'],['Curules','r']],
+        conPre(dipF.map(d=>`<tr><td class="n">${esc(bonito(d.dep))}</td><td class="n">${tipoHTML(d.lista,d.coal)}${d.coal?`<small>${esc(bonito(d.lista))}</small>`:''}${noms(d)}</td><td class="r">${d.cur} de ${d.de}</td></tr>`),
+          `<p class="reparto">${rd.txt}</p>${filtroHTML('dip')}`),
+        'En una coalición la curul es de la lista: el dato no dice de qué partido es cada elegido. Bogotá no tiene asamblea.');
+    }
+    if(A!=='resto'){
+      const ediF = filtra('edi', N.ediles);
+      h += tabla('Ediles de Bogotá 2023 <span class="chip est">estimado</span>', [['Localidad'],['Lista y elegidos'],['Curules','r']],
+        conPre(ediF.map(e=>`<tr><td class="n">${esc(bonito(e.loc))}</td><td class="n">${tipoHTML(e.lista,e.coal)}${noms(e)}</td><td class="r">${e.cur} de ${e.de}</td></tr>`),
+          `<p class="reparto">${re_.txt}, en ${N.ediles.length} de las 20 localidades</p>${filtroHTML('edi')}`),
+        `Según el nombre inscrito, en ${N.ediles.filter(e=>e.coal).length} localidades la lista fue en coalición con En Marcha y en ${N.ediles.filter(e=>!e.coal).length} se inscribió solo como «Partido Nuevo Liberalismo».`);
+    }
+    if(A!=='bogota'){
+      const concF = filtra('conc', conc);
+      h += `<div class="panel" style="grid-column:1/-1"><h3>Concejales 2023, municipio por municipio <span class="chip est">estimado</span></h3>
+        <p class="reparto">${rc.txt}${A==='resto'?' (sin Bogotá)':''}</p>${filtroHTML('conc')}
+        <div class="scroll" style="max-height:420px"><table class="t"><thead><tr><th>Municipio</th><th>Tipo de lista y elegidos</th><th class="r">% de la lista</th><th class="r">Curules</th></tr></thead><tbody>
+        ${concF.map(c=>`<tr class="clic" data-k="${c.k}" data-ir="concejo23"><td class="n">${esc(bonito(c.mun))}<small>${esc(bonito(c.dep))}</small></td><td class="n">${tipoHTML(c.lista,c.coal)}${c.coal?`<small>${esc(bonito(c.lista))}</small>`:''}${noms(c)}</td><td class="r">${pctTxt(c.pct)}</td><td class="r">${c.cur} de ${c.de}${c.k===BOG?'<span class="chip el">verificado</span>':''}</td></tr>`).join('') || '<tr><td colspan="4" style="color:var(--mute)">Ninguna con este filtro.</td></tr>'}
+        </tbody></table></div><p class="nota" style="margin:10px 0 0">Toca una fila para verla en el mapa.</p></div>`;
+    }
+    document.getElementById('det').innerHTML = h;
+  }
+  const BOGCUR = () => (I.nl.concejales.find(c=>c.k===BOG)||{cur:0}).cur;
+  document.addEventListener('click', e=>{
+    const r = e.target.closest('[data-ir]'); if(!r) return;
+    if(NL.ambito()==='bogota' && r.dataset.k!==BOG) return;
+    if(NL.ambito()==='bogota'){ NL.setAmbito('general'); }
+    S.capa = r.dataset.ir; S.p = 'nl'; S.m = r.dataset.k; todo();
+    setTimeout(()=>{ document.getElementById('mapa').scrollIntoView({behavior:'instant', block:'center'});
+      const l = porK[S.m]; if(l && mapa){ mapa.invalidateSize(); mapa.fitBounds(l.getBounds().pad(2.2), {animate:false, maxZoom:9}); } }, 30);
+  }, true);
+
+  /* ── franja de apertura, titular y cierre: todas las cifras salen del dato ── */
+  function cifras(){
+    const N = I.nl, R = I.resumen;
+    const cj = calc('concejo23','nl',false,'general'), cm = calc('camara26','nl',false,'general'), al = calc('alcaldia23','nl',false,'general'), ss = calc('senado26','nl',false,'general');
+    const bogC = (cj.mun[BOG]||{v:0}).v, bogA = (al.mun[BOG]||{v:0}).v, bogCam = (cm.mun[BOG]||{o:0}).o;
+    const fuera = N.concejales.filter(c=>c.k!==BOG);
+    const unos = fuera.filter(c=>c.cur===1).length;
+    const fuertes = Object.keys(cj.mun).filter(k=>k!==BOG && cj.mun[k].s>=.10 && I.capas.concejo23.m[k] && I.capas.concejo23.m[k].v>=PISO_VALIDOS)
+                    .sort((a,b)=>cj.mun[b].s-cj.mun[a].s);
+    const fuertesEl = fuertes.filter(k=>cj.mun[k].el).length;
+    return {N, R, cj, cm, al, ss, bogC, bogA, bogCam, fuera, unos, fuertes, fuertesEl,
+            rcT: reparto(N.concejales,'curules'), rcF: reparto(fuera,'curules'), rd: reparto(N.diputados,'curules'), re: reparto(N.ediles,'curules'),
+            pBogC: Math.round(100*bogC/cj.votos), pBogA: Math.round(100*bogA/al.votos), pBogCam: Math.round(100*bogCam/cm.propios)};
+  }
+  function pintaResumen(){
+    const A = NL.ambito(), X = cifras(), R = X.R, N = X.N;
+    const sen = N.congreso.filter(c=>c.corp==='Senado').length;
+    const h1 = document.getElementById('h1'), lead = document.getElementById('lead'), r30 = document.getElementById('r30'), imp = document.getElementById('implica');
+    const coalFuera = X.fuera.filter(c=>c.coal), marcha = N.concejales.filter(c=>c.coal && /MARCHA/i.test(c.lista));
+    if(A==='general'){
+      h1.innerHTML = `Bogotá pone ${X.pBogC} de cada 100 votos. Afuera, sus listas eligieron concejales en <em>${fmt(X.fuera.length)}</em> municipios.`;
+      lead.innerHTML = `En 2023 puso alcalde en Bogotá y en otros ${R.alcaldes-1} municipios, y sacó votos al concejo en ${fmt(X.cj.n)} de ${fmt(X.cj.nCapa)}. En 2026 llegó al Congreso con ${R.congresistas} personas, ninguna elegida por una lista con el nombre del partido.`;
+      r30.innerHTML = `
+        <div><div class="k">Dónde pesa</div><b>${X.pBogC} de cada 100</b><p>votos del partido a concejos en 2023 salieron de Bogotá; a alcaldías, ${X.pBogA}.</p></div>
+        <div><div class="k">Qué tan ancho</div><b>${fmt(X.rcT.t)} curules de concejo</b><p>en listas del partido: ${fmt(X.rcT.p)} en lista propia y ${fmt(X.rcT.c)} en coalición, en ${fmt(R.concejales_muns)} municipios (estimado). En ${fmt(X.unos)} de los ${fmt(X.fuera.length)} de fuera de Bogotá hay una sola.</p></div>
+        <div><div class="k">Cargos hoy</div><b>${fmt(R.alcaldes)} alcaldes</b><p>${R.alcaldes-R.alcaldes_coal} con aval propio y ${R.alcaldes_coal} en coalición, Bogotá incluida. En el Congreso tiene ${fmt(R.congresistas)} (${sen} en Senado, ${R.congresistas-sen} en Cámara), todos por listas de coalición.</p></div>`;
+      const top = X.fuertes.slice(0,3).map(k=>`${bonito(I.mun[k].n)} (${pct(X.cj.mun[k].s,0)})`).join(', ');
+      imp.innerHTML = `<div class="k">Qué significa para el partido</div><h2>Cuatro lecturas del inventario</h2><ol>
+        <li><div><b>El resultado nacional se juega en Bogotá.</b> De la capital salieron ${X.pBogC} de cada 100 votos a concejo y ${X.pBogA} de cada 100 a alcaldías en 2023, y ${X.pBogCam} de cada 100 de la lista propia a la Cámara en 2026. En 2027 el alcalde no puede repetir, así que la lista al Concejo de Bogotá carga ese peso sin el alcalde en el tarjetón.<span>Concejo y alcaldía 2023, Cámara 2026 · Constitución, art. 314.</span></div></li>
+        <li><div><b>Afuera, la presencia es ancha y delgada.</b> Las listas del partido tienen ${X.rcF.txt.replace(/<\/?b>/g,'')} en ${fmt(X.fuera.length)} municipios, y en ${fmt(X.unos)} de ellos hay una sola curul. Es una red que existe, pero en la mayoría de los lugares la sostiene una persona.<span>Curules estimadas con el reparto del art. 263 sobre el resultado por mesa.</span></div></li>
+        <li><div><b>Hay una base fuerte que no es Bogotá.</b> En ${fmt(X.fuertes.length)} municipios con 5.000 votos o más la lista superó el 10 % del concejo${X.fuertesEl===X.fuertes.length?' y en todos eligió':`, y en ${fmt(X.fuertesEl)} de ellos eligió`}. Los más altos: ${esc(top)}.<span>Concejo 2023, porcentaje sobre válidos con blanco.</span></div></li>
+        <li><div><b>En lo local va casi siempre solo; en el Congreso, acompañado.</b> ${fmt(X.rcT.p)} de las ${fmt(X.rcT.t)} curules de concejo y ${fmt(R.alcaldes - R.alcaldes_coal)} de las ${fmt(R.alcaldes)} alcaldías salieron de listas o avales propios. Las coaliciones aportaron ${fmt(X.rcT.c)} curules de concejo, ${fmt(marcha.reduce((a,c)=>a+c.cur,0))} de ellas con En Marcha (Bogotá incluida). Los ${fmt(R.congresistas)} congresistas entraron por listas compartidas, y la lista propia a la Cámara no eligió.<span>Concejo y alcaldía 2023 · bancada oficial del Congreso, octubre de 2026.</span></div></li>
+      </ol>`;
+    } else if(A==='bogota'){
+      const b = N.concejales.find(c=>c.k===BOG), a = X.al.mun[BOG], c26 = X.cm.mun[BOG], s26 = X.ss.mun[BOG];
+      const ediCoal = N.ediles.filter(e=>e.coal), ediProp = N.ediles.filter(e=>!e.coal);
+      h1.innerHTML = `En Bogotá, <em>${b.cur}</em> concejales en coalición con En Marcha y la alcaldía hasta 2027.`;
+      lead.innerHTML = `La capital es donde el partido tiene más: la alcaldía, la segunda lista más votada al Concejo y ediles en ${N.ediles.length} de las 20 localidades. En 2026 fue solo a la Cámara por Bogotá y no eligió.`;
+      r30.innerHTML = `
+        <div><div class="k">Concejo 2023</div><b>${b.cur} de 45 curules</b><p>${fmt(b.votos)} votos (${pct(b.pct,1)}) en la lista de coalición con En Marcha. Los 8 están hoy en la bancada del Nuevo Liberalismo (fuente oficial).</p></div>
+        <div><div class="k">Alcaldía 2023</div><b>${mil(a.v)} votos</b><p>Galán ganó con ${pct(a.s,0)} y aval propio. La lista al Concejo sacó ${Math.round(100*b.votos/a.v)} votos por cada 100 del alcalde.</p></div>
+        <div><div class="k">Ediles y 2026</div><b>${fmt(X.re.t)} curules de edil</b><p>${fmt(X.re.p)} en lista propia y ${fmt(X.re.c)} en coalición (estimado). En 2026, la lista propia a la Cámara sacó ${fmt(c26.o)} votos, sin curul.</p></div>`;
+      imp.innerHTML = `<div class="k">Qué significa para el partido · Bogotá</div><h2>Cuatro lecturas de la capital</h2><ol>
+        <li><div><b>El Concejo se ganó en coalición.</b> La lista fue «${esc(bonito(b.lista))}», con En Marcha. Sacó ${pct(b.pct,1)} y ${b.cur} de las 45 curules, y hoy los 8 concejales figuran en la bancada del Nuevo Liberalismo.<span>Concejo 2023 · bancada del Nuevo Liberalismo, Concejo de Bogotá, consulta del 10-nov-2026.</span></div></li>
+        <li><div><b>La lista estuvo muy por debajo del alcalde.</b> Galán sacó ${fmt(a.v)} votos; la lista al Concejo, ${fmt(b.votos)}: ${Math.round(100*b.votos/a.v)} por cada 100. En 2027 el alcalde no puede repetir, y la lista compite sin él en el tarjetón.<span>Alcaldía y Concejo 2023 · Constitución, art. 314.</span></div></li>
+        <li><div><b>Solo, en 2026, el voto fue mucho menor.</b> A la Cámara con lista propia sacó ${fmt(c26.o)} votos en Bogotá, cerca de ${Math.round(b.votos/c26.o)} veces menos que la lista al Concejo de 2023, y no eligió. Al Senado, Ahora Colombia (con MIRA y Dignidad) sacó ${fmt(s26.v)} en la ciudad.<span>Cámara y Senado 2026, comisiones escrutadoras.</span></div></li>
+        <li><div><b>Los ediles, mitad y mitad.</b> ${fmt(X.re.t)} curules de edil en ${N.ediles.length} localidades: ${fmt(X.re.c)} en listas de coalición con En Marcha (${ediCoal.length} localidades) y ${fmt(X.re.p)} en listas inscritas solo como Nuevo Liberalismo (${ediProp.length} localidades).<span>Estimado con el reparto sin curul de oposición, que en las JAL no existe.</span></div></li>
+      </ol>`;
+    } else {
+      const alcF = N.alcaldes.filter(a=>a.k!==BOG), fueraCam = X.cm.propios - X.bogCam;
+      const casi = X.unos/X.fuera.length >= .6 ? 'casi siempre con una sola curul' : 'muchas veces con una sola curul';
+      const top = X.fuertes.slice(0,3).map(k=>`${bonito(I.mun[k].n)} (${pct(X.cj.mun[k].s,0)})`).join(', ');
+      h1.innerHTML = `Fuera de Bogotá, sus listas eligieron concejales en <em>${fmt(X.fuera.length)}</em> municipios, ${casi}.`;
+      lead.innerHTML = `Lo que el partido tiene en el país sin contar la capital: concejos, alcaldías y asambleas de 2023, y su voto al Congreso de 2026.`;
+      r30.innerHTML = `
+        <div><div class="k">Concejos 2023</div><b>${fmt(X.rcF.t)} curules</b><p>en listas del partido: ${fmt(X.rcF.p)} en lista propia y ${fmt(X.rcF.c)} en coalición, en ${fmt(X.fuera.length)} municipios. En ${fmt(X.unos)} hay una sola (estimado).</p></div>
+        <div><div class="k">Base fuerte</div><b>${fmt(X.fuertes.length)} municipios</b><p>con 5.000 votos o más donde la lista pasó el 10 % del concejo. Los más altos: ${esc(top)}.</p></div>
+        <div><div class="k">Alcaldías y asambleas</div><b>${alcF.length} alcaldes</b><p>${alcF.filter(a=>!a.coal).length} con aval propio y ${alcF.filter(a=>a.coal).length} en coalición. En asambleas, ${fmt(X.rd.t)} curules: ${fmt(X.rd.p)} en lista propia y ${fmt(X.rd.c)} en coalición.</p></div>`;
+      imp.innerHTML = `<div class="k">Qué significa para el partido · resto del país</div><h2>Cuatro lecturas fuera de Bogotá</h2><ol>
+        <li><div><b>Ancha y delgada.</b> ${fmt(X.rcF.t)} curules de concejo en ${fmt(X.fuera.length)} municipios, y en ${fmt(X.unos)} una sola. La red existe, pero en la mayoría de los lugares la sostiene una persona.<span>Concejo 2023, curules estimadas con el art. 263.</span></div></li>
+        <li><div><b>Lo local, casi siempre con lista propia.</b> ${fmt(X.rcF.p)} de esas ${fmt(X.rcF.t)} curules salieron de listas inscritas solo por el partido; ${fmt(X.rcF.c)} de coaliciones (${[...new Set(coalFuera.flatMap(c=>aliados(c.lista)))].join(', ')}).<span>Según el nombre inscrito de cada lista.</span></div></li>
+        <li><div><b>Hay base fuerte para sostener.</b> En ${fmt(X.fuertes.length)} municipios con 5.000 votos o más la lista pasó el 10 %${X.fuertesEl===X.fuertes.length?' y en todos eligió':`, y en ${fmt(X.fuertesEl)} eligió`}. Los más altos: ${esc(top)}.<span>Concejo 2023, porcentaje sobre válidos con blanco.</span></div></li>
+        <li><div><b>Al Congreso llegó solo por coalición.</b> Los ${N.congreso.filter(c=>c.corp!=='Senado').length} representantes entraron por listas compartidas (${N.congreso.filter(c=>c.corp!=='Senado').map(c=>bonito(c.lista)).join(' y ')}). Con lista propia a la Cámara, fuera de Bogotá, sacó ${fmt(fueraCam)} votos y ninguna curul.<span>Cámara 2026 · bancada oficial, octubre de 2026.</span></div></li>
+      </ol>`;
+    }
+  }
+
+  /* ── Bogotá por localidad: mapa propio, girado 90° a la izquierda como se acostumbra ver la ciudad ── */
+  const B = {capa:'ediles', mapa:null, capaL:null, T:null, geo:null};
+  const kLoc = s => NL.norm(s).replace(/^(LA|LOS|EL) /,'');
+  function rotaBog(geo){
+    const cx=-74.08, cy=4.65, r = c => typeof c[0]==='number' ? [cx-(c[1]-cy), cy+(c[0]-cx)] : c.map(r);
+    return {type:'FeatureCollection', features: geo.features.map(f=>({...f, geometry:{type:f.geometry.type, coordinates:r(f.geometry.coordinates)}}))};
+  }
+  function datosLoc(){
+    const out = {};
+    for(const e of I.nl.ediles){ const k=kLoc(e.loc); (out[k]=out[k]||{}).ed = e; }
+    if(B.T) for(const [n,v] of Object.entries(B.T.bogota_perfil.localidad)){ const k=kLoc(n); if(!/PUESTO CENSO/.test(k)) (out[k]=out[k]||{}).cam = {...v, nom:n}; }
+    return out;
+  }
+  const valorLoc = (d) => B.capa==='ediles' ? (d && d.ed ? d.ed.cur/d.ed.de : null) : (d && d.cam && d.cam.cam ? d.cam.nl/d.cam.cam : null);
+  function cortesLoc(D){
+    const vs = Object.values(D).map(valorLoc).filter(v=>v!=null).sort((a,b)=>a-b);
+    if(!vs.length) return [0,0,0,0];
+    return [.2,.4,.6,.8].map(q=>vs[Math.min(vs.length-1, Math.floor(q*vs.length))]);
+  }
+  function estiloLoc(k, D, C){
+    const d = D[k], v = valorLoc(d), col = rampa(NL.color('nl'));
+    if(v==null) return {fillColor:VACIO, fillOpacity:.6, color:'rgba(255,255,255,.18)', weight:.8, dashArray:null};
+    let b=0; while(b<4 && v>=C[b]) b++;
+    const co = B.capa==='ediles' && d.ed && d.ed.coal;
+    return {fillColor:col[b], fillOpacity:1, color: co?'rgba(255,214,160,.9)':'rgba(255,255,255,.75)', weight: co?1.4:1, dashArray: co?'4 3':null};
+  }
+  function pintaBog(){
+    if(NL.ambito()!=='bogota') return;
+    const N = I.nl, cj = calc('concejo23','nl',false,'general'), cm = calc('camara26','nl',false,'general'), ss = calc('senado26','nl',false,'general'), al = calc('alcaldia23','nl',false,'general');
+    const b = N.concejales.find(c=>c.k===BOG), re_ = reparto(N.ediles,'curules');
+    const t = (v,l,s,est)=>`<div class="kpi"><div class="v nl">${v}</div><div class="l">${l}${est?'<span class="chip est">estimado</span>':''}</div><div class="s">${s}</div></div>`;
+    document.getElementById('bkpis').innerHTML =
+      t(`${b.cur} de 45`, 'Concejo 2023', `${pct(b.pct,1)} · coalición con En Marcha`) +
+      t(pct(al.mun[BOG].s,0), 'Alcaldía 2023', `Galán · ${fmt(al.mun[BOG].v)} votos`) +
+      t(`${re_.t} de ${I.resumen.ediles_de}`, 'ediles 2023', `${re_.p} lista propia · ${re_.c} coalición`, 1) +
+      t(fmt(cm.mun[BOG].o), 'Cámara 2026, lista propia', `${pctTxt(cm.mun[BOG].o/I.capas.camara26.m[BOG].v)} · sin curul`) +
+      t(fmt(ss.mun[BOG].v), 'Senado 2026, Ahora Colombia', `${pctTxt(ss.mun[BOG].s)} · con MIRA y Dignidad`);
+    document.getElementById('bcapa').innerHTML = [['ediles','Ediles 2023 · curules de la junta'],['camara','Cámara 2026 · lista propia']]
+      .map(([k,tx])=>`<button class="pill ${B.capa===k?'on':''}" data-bcapa="${k}">${tx}</button>`).join('');
+    const D = datosLoc(), C = cortesLoc(D);
+    if(B.capaL) B.capaL.eachLayer(l=>l.setStyle(estiloLoc(kLoc(l.feature.properties.n), D, C)));
+    /* leyenda */
+    const col = rampa(NL.color('nl')), fm = v => B.capa==='ediles' ? pct(v,0) : pct(v,1);
+    document.getElementById('bley').innerHTML = `<span class="tit">${B.capa==='ediles'?'Curules del partido sobre el total de la junta, 2023 (estimado)':'Lista propia del partido sobre los votos por listas a la Cámara, 2026'}</span>
+      <span class="esc">${col.map((x,i)=>`<span class="pz"><i style="background:${x}"></i>${i===0?'menos de '+fm(C[0]):i===4?fm(C[3])+' o más':fm(C[i-1])+'-'+fm(C[i])}</span>`).join('')}</span>
+      ${B.capa==='ediles'?'<span><i class="mk" style="background:'+col[2]+';border:1.4px dashed rgba(255,214,160,.9)"></i>lista en coalición con En Marcha</span><span><i class="mk" style="background:'+col[2]+';border:1px solid #fff"></i>lista propia</span>':''}
+      ${B.capa==='camara'&&!B.T?'<span style="color:var(--mute)">cargando…</span>':''}`;
+    /* tabla por localidad */
+    const filas = Object.entries(D).filter(([k,d])=>d.ed||d.cam).map(([k,d])=>({k,d,v:valorLoc(d)})).sort((a,b)=>(b.v??-1)-(a.v??-1));
+    const nombreL = (k,d) => d.cam ? d.cam.nom : bonito(d.ed.loc);
+    document.getElementById('blado').innerHTML = `<h3><span>Por localidad</span></h3>
+      <div class="scroll" style="max-height:600px"><table class="t"><thead><tr><th>Localidad</th><th>Ediles 2023</th><th class="r">Cámara 2026</th></tr></thead><tbody>
+      ${filas.map(({k,d})=>`<tr><td class="n">${esc(nombreL(k,d))}</td>
+        <td class="n">${d.ed?`<b>${d.ed.cur} de ${d.ed.de}</b> ${tipoHTML(d.ed.lista,d.ed.coal)}${d.ed.cerrada?'':`<small>${d.ed.nombres.map(n=>esc(persona(n))).join(' · ')}</small>`}`:'<span style="color:var(--mute)">sin curul</span>'}</td>
+        <td class="r">${d.cam?`${fmt(d.cam.nl)}<small>${pct(d.cam.nl/Math.max(1,d.cam.cam),1)}</small>`:'—'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="nota" style="margin:10px 0 0">Ediles: curules estimadas con el reparto del art. 263, sin curul de oposición. Cámara: votos de la lista propia del partido y su porcentaje entre las listas, por localidad del puesto.</p>`;
+  }
+  function tooltipLoc(k, ev){
+    const d = datosLoc()[k] || {}, n = d.cam ? d.cam.nom : (d.ed ? bonito(d.ed.loc) : k);
+    let h = `<b>${esc(n)}</b><br>`;
+    h += d.ed ? `Ediles 2023: <b>${d.ed.cur} de ${d.ed.de}</b> · ${esc(tipoTxt(d.ed.lista,d.ed.coal))}<br>` : '<span class="m">Sin curul de edil en 2023</span><br>';
+    if(d.cam) h += `Cámara 2026: ${fmt(d.cam.nl)} votos · ${pct(d.cam.nl/Math.max(1,d.cam.cam),1)} de las listas`;
+    tip(h, ev);
+  }
+  async function asegBog(){
+    if(NL.ambito()!=='bogota') return;
+    pintaBog();
+    if(!B.geo){ B.geo = rotaBog(await NL.dato('bog-localidades')); }
+    if(!B.mapa){
+      const el = document.getElementById('mapabog'); el.innerHTML='';
+      B.mapa = L.map(el, {zoomControl:true, attributionControl:false, zoomSnap:.25, zoomDelta:.5, scrollWheelZoom:false});
+      B.mapa.setView([4.65,-74.08], 11);
+      B.capaL = L.geoJSON(B.geo, {onEachFeature:(f,l)=>{ const k=kLoc(f.properties.n); l.on('mousemove', e=>tooltipLoc(k, e.originalEvent)); l.on('mouseout', ()=>tip(null)); }}).addTo(B.mapa);
+      if(window.ResizeObserver) new ResizeObserver(()=>B.mapa.invalidateSize()).observe(el);
+    }
+    const urb = L.geoJSON({type:'FeatureCollection', features:B.geo.features.filter(f=>f.properties.c!=='20')});
+    setTimeout(()=>{ B.mapa.invalidateSize(); B.mapa.fitBounds(urb.getBounds(), {animate:false, padding:[10,10]}); }, 0);
+    pintaBog();
+    if(!B.T){ try{ B.T = await NL.dato('tablero'); pintaBog(); }catch(e){ console.warn('sin tablero', e); } }
+  }
+  document.addEventListener('click', e=>{ const b=e.target.closest('[data-bcapa]'); if(!b) return; B.capa=b.dataset.bcapa; pintaBog(); });
+
+  function pintaMetodo(){
+    const R = I.resumen, mt = R.concejo_curules_metodo || {};
+    const nMun = (mt.coincide||0)+(mt.sube_por_lista||0)+(mt.lista_mas_corta||0)+(mt.lista_mas_larga_rara||0);
+    document.getElementById('metodo').innerHTML = `<ul class="met">
+      <li><b>Qué cuenta como presencia.</b> Una lista cuenta para cada partido que su nombre menciona, y si menciona a más de uno va marcada «coalición». Una coalición con nombre genérico («Juntos», «Cartagena mejor») no se le atribuye a ningún partido: de las ${fmt(R.concejo_listas)} listas de concejo de 2023, ${fmt(R.concejo_listas_otros)} están en ese caso o son de movimientos locales. La presencia real de todos los partidos es mayor que la que se ve.</li>
+      <li><b>Porcentajes.</b> Sobre votos válidos del municipio: listas o candidatos más voto en blanco. Por eso Bogotá da 14,4 % al concejo y no el 16,6 % que resulta de dividir solo entre votos por listas.</li>
+      <li><b>Territoriales 2023.</b> Registraduría, resultado mesa a mesa de la elección del 29 de octubre de 2023 (concejo, asamblea, alcaldía). Control: Galán 1.499.734 votos en Bogotá.</li>
+      <li><b>Curules de concejo: estimadas.</b> El número de curules sale de la escala del artículo 22 de la Ley 136 de 1994 con la población que proyecta el DANE para 2023 (Bogotá, 45). En ${fmt(mt.coincide||0)} de ${fmt(nMun)} municipios esa cifra coincide con la lista más larga inscrita; en ${fmt(mt.sube_por_lista||0)} la lista era más larga y manda la lista. El reparto aplica el artículo 263 de la Constitución: umbral de medio cuociente sobre válidos con blanco y cifra repartidora, reservando una curul al segundo de la alcaldía (Estatuto de la Oposición), que se supone aceptada en todos los municipios. En Bogotá el cálculo reproduce la cifra repartidora real (49.481) y las 8 curules de la lista del partido. La declaratoria oficial de cada municipio puede diferir.</li>
+      <li><b>Diputados: estimados.</b> Curules del Decreto 1312 de 2023 y el mismo reparto, con la curul de oposición salvo en Antioquia, donde fue rechazada. Los nombres son los más votados de cada lista abierta.</li>
+      <li><b>Ediles de Bogotá: estimados.</b> Curules oficiales de cada Junta (Registraduría) y reparto sin curul de oposición, que en las JAL no existe.</li>
+      <li><b>Congreso 2026.</b> Mesa a mesa de las comisiones escrutadoras (abril de 2026). El ajuste posterior del Consejo Nacional Electoral al Senado movió votos pero ninguna curul y no está a nivel de municipio. La capa de Senado no incluye la circunscripción indígena. Los votos del exterior entran a los totales y no al mapa.</li>
+      <li><b>Bancada oficial.</b> Partido que registran el Senado y la Cámara para cada congresista, corte del 27 de octubre de 2026. No siempre es la lista por la que fue elegido.</li>
+      <li><b>Lo que este mapa no mide.</b> Militancia, directorios, avales a candidatos que perdieron en coaliciones genéricas, ni los cambios de partido posteriores a la elección.</li>
+    </ul>`;
+  }
+
+  /* ── estado en la URL ── */
+  function guarda(){
+    const q = new URLSearchParams(); if(S.capa!=='concejo23') q.set('capa',S.capa); if(S.p!=='nl') q.set('p',S.p); if(S.m) q.set('m',S.m); if(S.rel) q.set('rel','1');
+    const a = NL.ambito(); if(a!=='general') q.set('ambito', a);
+    const s = q.toString(); history.replaceState(null,'', location.pathname + (s?'?'+s:''));
+  }
+  function lee(){
+    const q = new URLSearchParams(location.search);
+    if(q.get('capa') && capaDef(q.get('capa'))) S.capa = q.get('capa');
+    if(q.get('p') && NL.PARTIDOS[q.get('p')]) S.p = q.get('p');
+    if(q.get('m') && I.mun[q.get('m')]) S.m = q.get('m');
+    S.rel = q.get('rel')==='1';
+  }
+  function todo(){ pintaControles(); pintaKPI(); estilos(); pintaLado(); guarda(); }
+
+  /* ── arranque ── */
+  (async function(){
+    try{
+      I = await NL.dato('inventario');
+      lee(); pintaControles(); pintaKPI(); pintaLado(); pintaHoy(); pintaResumen(); pintaMetodo();
+      asegBog();
+      NL.alCambiarAmbito(a=>{
+        if(a==='bogota' && S.m && S.m!==BOG) S.m = null;
+        pintaKPI(); pintaLado(); pintaHoy(); pintaResumen(); guarda();
+        if(capaMun){ estilos(); setTimeout(()=>{ mapa.invalidateSize(); if(!S.m) mapa.fitBounds([[-4.3,-79.3],[12.7,-66.7]], {animate:false, padding:[4,4]}); }, 0); }
+        asegBog();
+      });
+      const [geo, deps] = await Promise.all([NL.dato('municipios'), NL.dato('deptos')]);
+      creaMapa(geo, deps); estilos();
+      if(S.m && porK[S.m]) setTimeout(()=>mapa.fitBounds(porK[S.m].getBounds().pad(2.2), {animate:false, maxZoom:9}), 30);
+      window.INV = {I, S, calc, partidosDe};   // para depurar
+    }catch(err){
+      console.error(err);
+      document.getElementById('mapa').innerHTML = `<div class="cargando">No se pudieron cargar los datos (${esc(err.message)}). Abre la página desde un servidor local, no como archivo.</div>`;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

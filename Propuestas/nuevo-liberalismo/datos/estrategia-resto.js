@@ -1,0 +1,592 @@
+window.NLD=window.NLD||{};window.NLD['estrategia-resto']={
+ "v": "2026-11-10",
+ "ambito": "resto",
+ "frase": "La red de concejales que cumple y rinde cuentas",
+ "idea": "Fuera de Bogotá el partido se gana municipio a municipio, no por opinión. La estrategia es volver una red a sus concejales sueltos, con un mismo sello: no le deben la curul a nadie, muestran logros pequeños con prueba y rinden cuentas cada mes.",
+ "nota_eje": "Es la versión regional de «independencia que cumple». En un municipio la independencia no se declara frente a un polo nacional: se demuestra frente a las estructuras locales, con las cuentas a la vista.",
+ "por_que": [
+  {
+   "t": "Es una presencia de personas, no de marca",
+   "x": "Fuera de Bogotá el partido tiene curul en 185 municipios y en 134 de ellos hay un solo concejal. Casi todas las listas fueron con voto preferente (184 de 185), así que cada curul la ganó alguien con votos propios. Hoy eso es una suma de trayectorias individuales: lo único que las une es el aval.",
+   "dato": "246 curules de concejo estimadas en 185 municipios; 134 con una sola; 233 en lista propia y 13 en coalición.",
+   "mod": "inventario"
+  },
+  {
+   "t": "El mapa real no es el de la marca",
+   "x": "El partido se piensa urbano y de opinión, pero su fuerza regional está en municipios medianos y pequeños: la mitad de los que tienen curul no pasa de 26.306 habitantes. Pesa en el Caribe (77 curules) y en Santander, Antioquia y Boyacá (85). En las capitales grandes casi no existe: Cali 0,8 %, Cúcuta 2,0 %, Bucaramanga 2,4 %.",
+   "dato": "Caribe 77 y Santander, Antioquia y Boyacá 85 de las 246 curules. Sin lista al concejo en 2023 en Medellín, Barranquilla, Pereira, Armenia, Neiva, Santa Marta, Valledupar y Tunja.",
+   "mod": "escenarios"
+  },
+  {
+   "t": "Todo se decide por pocos votos",
+   "x": "En 99 municipios la lista se quedó a menos de 300 votos de su primera curul. Y en 93 de los 185 donde sí eligió, la última curul se sostiene con 300 votos o menos de ventaja. Con márgenes así el resultado no depende de la conversación nacional: depende de organización, de candidatos con arraigo y de quién sale a votar.",
+   "dato": "99 municipios sin curul a menos de 300 votos de la primera; 93 con curul y ventaja de 300 votos o menos (34 con 100 o menos). Curules estimadas, no la declaratoria.",
+   "mod": "escenarios"
+  },
+  {
+   "t": "El votante de octubre no es el de la presidencial",
+   "x": "En las territoriales vuelve a votar gente que en la presidencial se quedó en casa. Fuera de Bogotá, 39 % del voto liberal de marzo no votó en primera vuelta, y pasó algo parecido con el conservador (31 %) y el de la U (33 %). En el Caribe votó más gente al Senado que a la presidencia. A ese votante lo mueven estructuras locales, no los polos.",
+   "dato": "Voto liberal al Senado fuera de Bogotá que no votó en primera vuelta: 39 % (margen de 32 % a 45 %, estimación del modelo). Caribe: votó 58,1 % del censo al Senado y 48,1 % en primera vuelta.",
+   "mod": "tablero"
+  }
+ ],
+ "lugar": {
+  "x": "En un municipio el partido no compite por ideología: compite por confianza. El lugar que puede ocupar es simple y hoy está libre: el concejal que no le debe la curul a ninguna casa política y por eso puede mostrar sus cuentas. Es la independencia nacional llevada a escala local. La marca casi no llega por la prensa (5 de 67.654 titulares), así que ese lugar lo construye cada elegido en su territorio y el partido lo vuelve sello común.",
+  "propios": [
+   {
+    "tema": "Cuentas claras del municipio",
+    "x": "Legalidad y anticorrupción en versión local: contratos, obras inconclusas y plata de regalías, siempre con el documento en la mano. Es un terreno con poca competencia y mucho rechazo ciudadano.",
+    "dato": "La corrupción es 2,8 % de los titulares de asuntos públicos fuera de Bogotá y 92 % de ellos tiene tono negativo."
+   },
+   {
+    "tema": "Control político que se ve",
+    "x": "El concejal que cita, pregunta y publica la respuesta. Tomar posición con un dato propio es la forma de existir sin presupuesto ni pauta.",
+    "dato": "La justicia pasó de 9,5 % a 15,0 % de la agenda entre el primer y el último tercio del semestre: los temas de instituciones van subiendo."
+   }
+  ],
+  "consenso": [
+   {
+    "tema": "Seguridad",
+    "x": "Todos la quieren y el gobierno nacional la reclama. El partido entra por la presencia del Estado y la legalidad en el municipio (policía, alumbrado, inspección, justicia cercana), no por la mano dura.",
+    "dato": "Primer tema de la prensa en 20 de 27 semanas. 73,8 % cree que el Estado perdió presencia en zonas con grupos ilegales (Invamer, mayo de 2026)."
+   },
+   {
+    "tema": "Salud",
+    "x": "Es lo más urgente para la gente y casi nadie lo trabaja desde lo local. El concejal puede vigilar el hospital, el puesto de salud y la ambulancia, y decir con claridad qué depende del municipio y qué no.",
+    "dato": "71,9 % la pone entre lo más urgente (Invamer); en la prensa pesa 6,3 % de los titulares."
+   },
+   {
+    "tema": "Vías y servicios públicos",
+    "x": "El tema de cada departamento es distinto (el agua, la vía, la tarifa) y ahí se mide al concejal. No hace falta una línea nacional: hace falta estar en el tema del municipio con una gestión que se pueda probar. Criterio de oficio.",
+    "dato": "Movilidad e infraestructura suman 8,5 % de los titulares fuera de Bogotá."
+   }
+  ],
+  "ceder": [
+   {
+    "tema": "La pelea entre gobierno y oposición",
+    "x": "Los dos polos no se movieron y tienen dueño: fuera de Bogotá, 89 % del voto del Pacto fue con Cepeda y 83 % del Centro Democrático con De la Espriella. Entrar ahí le quita al candidato local su único activo, que es no deberle nada a nadie."
+   },
+   {
+    "tema": "La mano dura",
+    "x": "Es el tema del gobierno nacional y de la derecha. Competir ahí es jugar en cancha ajena y con las reglas de otro."
+   }
+  ],
+  "refs": [
+   "T1",
+   "T2",
+   "T3"
+  ]
+ },
+ "pilares": [
+  {
+   "t": "Una red, no 246 curules sueltas",
+   "x": "Cada concejal ya está en campaña permanente desde su curul; falta que se note y que sume. El sello común son tres hábitos: logros pequeños anunciados uno por uno, una rendición de cuentas al mes en su territorio y una posición pública con dato propio. El partido los recoge y los muestra como red. Así la marca nacional le sirve al candidato local, y no al revés.",
+   "como": [
+    "Una pieza de crédito por semana por concejal: un logro con fecha y prueba. Cuenta más cuántas veces que el tamaño.",
+    "Un encuentro mensual de rendición de cuentas en el municipio, con un compromiso que se pueda verificar. No un mitin.",
+    "Un tablero regional del partido que junte esos logros por departamento y los publique con el mismo formato."
+   ],
+   "principio": "A7",
+   "refs": [
+    "T19",
+    "T20",
+    "T21",
+    "R3.1",
+    "R3.2"
+   ],
+   "oficio": false
+  },
+  {
+   "t": "Concentrar: retener primero, crecer después",
+   "x": "En 2023 el partido presentó 386 listas fuera de Bogotá y 201 no eligieron a nadie. Con recursos escasos el orden importa: primero cuidar las curules que penden de pocos votos, luego ir por los municipios que se quedaron a un paso y solo después abrir plaza nueva. El contacto de campaña casi no persuade a quien no conoce al candidato, así que no rinde gastar donde no hay base.",
+   "como": [
+    "Plan de defensa, municipio por municipio, de las 93 curules que se sostienen con 300 votos o menos.",
+    "Candidato y equipo definidos antes de marzo de 2027 en los 99 municipios que quedaron a menos de 300 votos.",
+    "Línea de base por puesto de votación en cada municipio foco, para medir después qué movió la presencia."
+   ],
+   "principio": "A6",
+   "refs": [
+    "T14",
+    "T17",
+    "T18"
+   ],
+   "oficio": false
+  },
+  {
+   "t": "Candidatos con voto propio y una sola regla para las listas",
+   "x": "Con voto preferente la curul la gana la persona, y el rival más cercano suele estar en la misma lista. El aval va a quien tenga arraigo medible y acepte el sello de cuentas claras. Para escoger entre lista propia y coalición, la misma regla en todos los departamentos: lista propia donde el partido ya pasa el umbral solo; coalición solo donde no lo pasa, con su nombre en la lista y la curul acordada por escrito.",
+   "como": [
+    "Medir por puesto lo que rinde cada aspirante y cada líder antes de entregar el aval.",
+    "Revisar en cada municipio y departamento si la suma con el aliado cabe en el 15 % que permite la ley para coaliciones.",
+    "Buscar desde ya a las candidatas: la cuota del 30 % aplica a todos los concejos y una lista que no la cumple se cae."
+   ],
+   "principio": "A1",
+   "refs": [
+    "T3",
+    "R3.3"
+   ],
+   "oficio": true
+  },
+  {
+   "t": "Movilizar al votante local, casa por casa",
+   "x": "En un municipio de 26.306 habitantes la elección la define quién sale a votar. Lo que rinde es el contacto personal de alguien conocido, que además llega a todo el hogar. La pauta casi no mueve preferencias y su efecto dura pocos días. La campaña regional es una red de hogares por puesto de votación, no una campaña de medios.",
+   "como": [
+    "Ubicar desde ahora los hogares y las comunidades donde ya votan por el concejal: son la base de octubre.",
+    "Visita cara a cara en campaña: cómo se marca el voto preferente en el tarjetón y cómo llegar al puesto.",
+    "Guardar la pauta para las últimas semanas y usar las redes para que la base reparta lo que ya se hizo."
+   ],
+   "principio": "A5",
+   "refs": [
+    "T13",
+    "T15",
+    "T16",
+    "T24",
+    "R2.2"
+   ],
+   "oficio": false
+  },
+  {
+   "t": "Alcaldías y asambleas como ancla",
+   "x": "Fuera de Bogotá el partido tiene 10 alcaldes y 7 diputados. Son su vitrina: el votante juzga por lo que ve, y una alcaldía bien contada vale más que cualquier mensaje. Los alcaldes no pueden repetir, así que lo que se hereda es la gestión. La asamblea da escala donde hay densidad: en Córdoba, Santander y Casanare eligió diputado con lista propia.",
+   "como": [
+    "Cada alcaldía con un balance público de lo cumplido, que diga qué dependía del municipio y qué no.",
+    "Lista propia a la asamblea donde hay concejales en muchos municipios; en el resto, la misma regla de coalición.",
+    "Los diputados como enlace de la red: llevan a la asamblea lo que un concejal no puede resolver solo."
+   ],
+   "principio": "A7",
+   "refs": [
+    "R3.4",
+    "T19",
+    "T20"
+   ],
+   "oficio": true
+  }
+ ],
+ "audiencias": [
+  {
+   "quien": "Quien ya vota por el concejal del partido",
+   "donde": "Los 185 municipios con curul; sobre todo Antioquia, Santander, Córdoba y Bolívar",
+   "cuadrante": "retener",
+   "decir": "Esto conseguí, esto falta y esto no depende de mí. Todavía no se pide el voto: se rinden cuentas.",
+   "refs": [
+    "T14",
+    "T21",
+    "R3.1"
+   ]
+  },
+  {
+   "quien": "Los municipios donde la lista ya es una fuerza",
+   "donde": "55 municipios donde pasó el 10 %: Córdoba (7), Bolívar (7), Santander (6), Magdalena (5), Antioquia (5), Casanare (5)",
+   "cuadrante": "retener-crecer",
+   "decir": "Ya somos parte del concejo. El paso que sigue es la alcaldía o la asamblea, con las mismas cuentas claras.",
+   "refs": [
+    "T21",
+    "R3.2"
+   ]
+  },
+  {
+   "quien": "El votante de las estructuras tradicionales",
+   "donde": "El Caribe y los municipios donde el Senado se vota más que la presidencia",
+   "cuadrante": "conocer",
+   "decir": "No se le pide cambiar de bando. Se le muestra lo que puede perder si nadie vigila la plata del municipio, en reuniones pequeñas y con una propuesta concreta.",
+   "refs": [
+    "R3.2",
+    "R3.5",
+    "T6"
+   ]
+  },
+  {
+   "quien": "El votante de opinión de las capitales intermedias",
+   "donde": "Montería, Manizales, Sincelejo, Popayán, Pasto, Ibagué y Cartagena, donde ya hay curul",
+   "cuadrante": "conocer",
+   "decir": "Un tema de ciudad con un dato que nadie más tiene. Aquí la marca del partido sí suma.",
+   "refs": [
+    "T1",
+    "T2",
+    "T20"
+   ]
+  },
+  {
+   "quien": "Las grandes capitales sin base",
+   "donde": "Cali, Cúcuta, Medellín y Barranquilla",
+   "cuadrante": "no-gastar",
+   "decir": "Nada por ahora. Sin un candidato con votos propios ya medidos, el esfuerzo rinde más en otra parte.",
+   "refs": [
+    "T14"
+   ]
+  }
+ ],
+ "relato": {
+  "yo": "A mí me eligieron sin deberle la curul a ninguna casa política. Por eso puedo mostrar en qué voté, qué pedí y qué conseguí.",
+  "nosotros": "Somos los municipios donde las cosas se deciden lejos y se pagan cerca: la vía, el puesto de salud, el agua. Aquí todos sabemos quién cumple y quién aparece cada cuatro años.",
+  "ahora": "En octubre de 2027 se eligen los concejos que van a vigilar cuatro años de plata del municipio. Es el momento de poner ahí a alguien que rinda cuentas.",
+  "refs": [
+   "T8",
+   "T7"
+  ]
+ },
+ "contraste": [
+  {
+   "frente": "Las estructuras tradicionales del municipio",
+   "x": "Con un hecho que cualquiera pueda comprobar: nuestras cuentas están publicadas, pidan las de los demás. Sin nombres propios ni acusaciones sin documento: el ataque no rinde más y se devuelve."
+  },
+  {
+   "frente": "Los dos polos nacionales",
+   "x": "No se contrasta: se declina la pelea. El concejal responde por su municipio; del gobierno nacional apoya lo que sirve aquí y vigila lo que no."
+  },
+  {
+   "frente": "Los aliados de coalición",
+   "x": "Sin pelea y con reglas: el nombre del partido visible en la lista y en la publicidad, y el reparto de la curul escrito antes de inscribir."
+  },
+  {
+   "frente": "Los rivales de la propia lista",
+   "x": "Con voto preferente se compite adentro. El contraste es el trabajo hecho, con fechas; nunca contra el compañero de lista."
+  }
+ ],
+ "fases": [
+  {
+   "fase": "Posicionamiento",
+   "desde": "2026-11-10",
+   "hasta": "2027-02-28",
+   "foco": "Armar la red y decidir dónde se juega. La persuasión se hace ahora; en campaña casi no mueve a nadie.",
+   "acciones": [
+    "Censo real de concejales, alcaldes y diputados, para reemplazar la estimación de esta presentación.",
+    "Mapa por departamento: qué se retiene, dónde se crece, dónde se abre y dónde no se gasta.",
+    "Arranca el sello: crédito semanal y rendición de cuentas mensual de cada elegido.",
+    "Línea de base por puesto de votación en los municipios foco."
+   ]
+  },
+  {
+   "fase": "Precampaña",
+   "desde": "2027-03-01",
+   "hasta": "2027-07-30",
+   "foco": "Cerrar candidatos, listas y coaliciones con la misma regla en todo el país.",
+   "acciones": [
+    "Avales con medición por puesto y filtro de antecedentes.",
+    "Decisión de lista propia o coalición, departamento por departamento.",
+    "Listas completas y con cuota de género, inscritas entre el 30 de junio y el 30 de julio de 2027.",
+    "Red de hogares que van a movilizar en octubre."
+   ]
+  },
+  {
+   "fase": "Campaña",
+   "desde": "2027-07-31",
+   "hasta": "2027-10-23",
+   "foco": "Movilizar a quien ya prefiere al candidato y sostener los temas propios.",
+   "acciones": [
+    "Contacto cara a cara en los hogares donde ya hay voto.",
+    "Crédito frecuente: muchos logros pequeños, cada uno con su prueba.",
+    "La pauta, solo en las últimas semanas."
+   ]
+  },
+  {
+   "fase": "Día D",
+   "desde": "2027-10-24",
+   "hasta": "2027-10-31",
+   "foco": "Sacar a votar y cuidar cada voto: aquí se gana o se pierde por decenas.",
+   "acciones": [
+    "Transporte y recordatorio por hogar, sin revelar nunca quién votó.",
+    "Enseñar a marcar el tarjetón: logo del partido y número del candidato.",
+    "Testigos primero en los municipios de margen corto: 34 curules con 100 votos o menos de ventaja y 99 a menos de 300 de la primera."
+   ]
+  }
+ ],
+ "agenda": [
+  {
+   "si": "Cuando la agenda regional esté en seguridad y orden público",
+   "haz": "Entra por la presencia del Estado en el municipio: qué pidió el concejal (policía, alumbrado, inspección), a quién y en qué fecha.",
+   "no": "No compitas en mano dura ni comentes cada hecho.",
+   "dato": "Es 20,5 % de los titulares fuera de Bogotá, pero una historia de seguridad dura 2 días en la mediana."
+  },
+  {
+   "si": "Cuando salte un caso de corrupción local o departamental",
+   "haz": "Es el terreno propio: hay que estar siempre. Pide el contrato, publica el dato y propón el control. El concejal del partido habla primero.",
+   "no": "No acuses a personas sin documento ni lo vuelvas pelea entre partidos.",
+   "dato": "92 % de los titulares de corrupción tiene tono negativo, y en el banco ninguno nombra al partido."
+  },
+  {
+   "si": "Cuando el tema sea la salud: el hospital, la EPS, la ambulancia",
+   "haz": "Debate de control en el concejo, visita al puesto de salud y un compromiso con fecha. Explica qué controla el municipio.",
+   "no": "No prometas lo que depende de la Nación.",
+   "dato": "71,9 % la pone entre lo más urgente (Invamer) y solo pesa 6,3 % de los titulares: hay demanda y poco dueño."
+  },
+  {
+   "si": "Cuando estalle un escándalo nacional, del gobierno o de la oposición",
+   "haz": "Una frase de independencia y de vuelta al tema del municipio.",
+   "no": "No gastes la semana ni te alinees con un polo.",
+   "dato": "La historia típica dura 3 días y solo 11 % pasa de una semana. La crisis del entorno de Petro estuvo en titulares 27 de 27 semanas porque un caso releva al otro: nunca termina, y no es del partido."
+  },
+  {
+   "si": "Cuando haya una emergencia: invierno, sequía, un sismo, una vía caída",
+   "haz": "Presencia y gestión: el concejal como enlace con la alcaldía y la gobernación, y después el crédito por cada gestión cumplida.",
+   "no": "No aparezcas sin una gestión que mostrar.",
+   "dato": "Las emergencias son las historias que más duran: la del terremoto de agosto estuvo 47 días en titulares, contra 3 de la historia típica."
+  },
+  {
+   "si": "Cuando el tema sea el bolsillo: empleo, tarifas, el precio de la cosecha",
+   "haz": "Toma posición con una cifra del municipio y una propuesta que el concejo sí pueda aprobar.",
+   "no": "No hables de la economía como algo que nadie decide: señala quién responde.",
+   "dato": "Economía y empleo pasó de 4,8 % a 10,1 % de la agenda entre el primer y el último tercio del semestre."
+  }
+ ],
+ "riesgos": [
+  {
+   "r": "El elegido con voto propio se va con su voto, o no aspira.",
+   "manejo": "Aval temprano y reglas de renglón claras. El plazo para renunciar a la curul y cambiar de partido venció el 30 de junio de 2026: quien hoy es concejal del partido ya no puede inscribirse por otro, y quien tiene curul de otro partido tampoco puede llegar."
+  },
+  {
+   "r": "La coalición borra la marca.",
+   "manejo": "En 2023 solo 13 de 246 curules de concejo salieron de coalición, pero 4 de 7 diputados sí. La regla: nombre visible, curul acordada por escrito y coalición solo donde el partido no pasa el umbral."
+  },
+  {
+   "r": "Un aval a quien trae votos pero no cumple el sello daña el tema propio.",
+   "manejo": "Filtro de antecedentes antes del aval y compromiso firmado de rendir cuentas. Un solo caso basta para vaciar el discurso de cuentas claras. Criterio de oficio."
+  },
+  {
+   "r": "La dispersión: muchas listas y pocos votos por lista.",
+   "manejo": "En 2023, 201 de 386 listas no eligieron y 146 no pasaron el umbral. Menos listas, mejor escogidas, salvo donde una lista corta ayude a un candidato a alcaldía."
+  },
+  {
+   "r": "Decidir con cifras estimadas.",
+   "manejo": "Las curules de esta presentación salen de aplicar la regla al consolidado, no de la declaratoria; 48 municipios tienen dudas de tamaño del concejo. Antes de asignar recursos se verifica con el censo real del partido."
+  },
+  {
+   "r": "La marca nacional no ayuda porque no se ve.",
+   "manejo": "El partido aparece en 5 de 67.654 titulares. No se resuelve con pauta: se resuelve con la red contando lo que hace cada semana."
+  }
+ ],
+ "medir": [
+  {
+   "que": "Curules de margen corto que se sostienen",
+   "como": "De las 93 con 300 votos o menos de ventaja, cuántas tienen candidato y equipo en marzo de 2027 y cuántas se conservan en octubre."
+  },
+  {
+   "que": "Municipios a un paso que cruzan",
+   "como": "De los 99 a menos de 300 votos, cuántos inscriben lista con candidato medido y cuántos eligen."
+  },
+  {
+   "que": "El sello funcionando",
+   "como": "Rendiciones de cuentas hechas por mes y piezas de crédito publicadas por concejal, contadas en el tablero regional."
+  },
+  {
+   "que": "La marca en las listas",
+   "como": "Proporción de curules en lista propia (en 2023: 233 de 246) y coaliciones con el nombre del partido visible."
+  },
+  {
+   "que": "Movilización",
+   "como": "Participación por puesto en los municipios foco frente a 2023, comparando puestos con y sin trabajo de campaña."
+  },
+  {
+   "que": "Presencia en la conversación regional",
+   "como": "Titulares que nombran al partido o a sus elegidos en medios regionales. Hoy: 5 de 67.654."
+  }
+ ],
+ "territorios": [
+  {
+   "grupo": "Retener",
+   "x": "Departamentos donde el partido ya es una presencia densa. Aquí se defiende lo ganado y se pide más: alcaldías y asamblea.",
+   "lugares": [
+    "Antioquia: 38 curules en 29 municipios",
+    "Santander: 34 curules en 29 municipios",
+    "Córdoba: 20 curules en 10 municipios",
+    "Bolívar: 20 curules en 13 municipios",
+    "Boyacá: 13 curules en 11 municipios",
+    "Caldas: 12 curules en 9 municipios",
+    "Sucre: 12 curules en 10 municipios",
+    "Casanare: 10 curules en 7 municipios",
+    "Magdalena: 10 curules en 7 municipios",
+    "Montería: 3 de 19 curules con 12,6 %",
+    "Manizales: 2 de 19 con 9,2 %",
+    "Alcaldías: Mosquera, Florencia, María la Baja, San José del Guaviare, Barranco de Loba, Medio Baudó, Marsella, Aratoca, Balboa, Cácota"
+   ]
+  },
+  {
+   "grupo": "Crecer",
+   "x": "Municipios donde la lista se quedó a menos de 300 votos de su primera curul. Es donde menos votos separan al partido de tener concejal.",
+   "lugares": [
+    "Santander: 18 municipios",
+    "Boyacá: 15 municipios",
+    "Antioquia: 12 municipios",
+    "Caldas: 5 municipios",
+    "Tolima: 5 municipios",
+    "Cesar: 5 municipios",
+    "Caquetá: 4 municipios",
+    "Norte de Santander: 4 municipios",
+    "Bolívar: 4 municipios",
+    "Salamina (Caldas): a 1 voto",
+    "Socorro (Santander): a 21 votos",
+    "Segovia (Antioquia): a 30 votos",
+    "El Carmen de Viboral (Antioquia): a 92 votos",
+    "Lebrija (Santander): a 152 votos",
+    "Sabaneta (Antioquia): a 212 votos",
+    "La Dorada (Caldas): a 213 votos",
+    "Yopal (Casanare): a 56 votos de la segunda curul"
+   ]
+  },
+  {
+   "grupo": "Abrir",
+   "x": "Capitales donde ya hay una curul o una base que pasó el umbral, y donde un tema de ciudad puede rendir. Se entra con candidato medido, no con lista de relleno.",
+   "lugares": [
+    "Sincelejo: 1 curul con 6,7 %",
+    "Popayán: 1 curul con 6,0 %",
+    "Riohacha: 1 curul con 5,9 %",
+    "Quibdó: 1 curul con 5,8 %",
+    "Pasto: 1 curul con 4,9 %",
+    "Ibagué: 1 curul con 4,9 %",
+    "Cartagena: 1 curul con 4,5 %",
+    "Bucaramanga: sin curul, 2,4 %, a 1.988 votos; es la capital del departamento con más municipios del partido",
+    "Meta: 7 listas en 2023 y ninguna curul; 2 municipios a menos de 300 votos"
+   ]
+  },
+  {
+   "grupo": "No gastar",
+   "x": "Plazas grandes donde el partido no pasó el umbral o no tuvo lista. Sin un candidato con votos propios ya medidos, el esfuerzo rinde más en otra parte.",
+   "lugares": [
+    "Cali: 0,8 %, a 18.109 votos de una curul",
+    "Cúcuta: 2,0 %, a 4.991 votos",
+    "Villavicencio: 2,2 %, a 2.094 votos",
+    "Sin lista al concejo en 2023: Medellín, Barranquilla, Pereira, Armenia, Neiva, Santa Marta, Valledupar y Tunja",
+    "Sin ninguna lista al concejo en 2023: Amazonas y Vaupés"
+   ]
+  }
+ ],
+ "refs": [
+  {
+   "id": "T1",
+   "corto": "Ries y Trout 1981",
+   "texto": "Ries, Al y Jack Trout. 1981. Positioning: The Battle for Your Mind. Nueva York: McGraw-Hill.",
+   "doi": null
+  },
+  {
+   "id": "T2",
+   "corto": "Petrocik (y Stokes) 1996",
+   "texto": "Petrocik, John R. 1996. \"Issue Ownership in Presidential Elections, with a 1980 Case Study\". American Journal of Political Science 40 (3): 825-850. / Stokes, Donald E. 1963. \"Spatial Models of Party Competition\". American Political Science Review 57 (2): 368-377.",
+   "doi": "https://doi.org/10.2307/2111797"
+  },
+  {
+   "id": "T3",
+   "corto": "Carey y Shugart (y Pachón y Shugart) 1995",
+   "texto": "Carey, John M. y Matthew Soberg Shugart. 1995. \"Incentives to Cultivate a Personal Vote: A Rank Ordering of Electoral Formulas\". Electoral Studies 14 (4): 417-439. / Pachón, Mónica y Matthew Soberg Shugart. 2010. \"Electoral Reform and the Mirror Image of Inter-Party and Intra-Party Competition: The Adoption of Party Lists in Colombia\". Electoral Studies 29 (4).",
+   "doi": "https://doi.org/10.1016/0261-3794(94)00035-2"
+  },
+  {
+   "id": "T6",
+   "corto": "Feinberg y Willer 2015",
+   "texto": "Feinberg, Matthew y Robb Willer. 2015. \"From Gulf to Bridge: When Do Moral Arguments Facilitate Political Influence?\". Personality and Social Psychology Bulletin 41 (12): 1665-1681.",
+   "doi": "https://doi.org/10.1177/0146167215607842"
+  },
+  {
+   "id": "T7",
+   "corto": "Westen 2007",
+   "texto": "Westen, Drew. 2007. The Political Brain: The Role of Emotion in Deciding the Fate of the Nation. Nueva York: PublicAffairs.",
+   "doi": null
+  },
+  {
+   "id": "T8",
+   "corto": "Ganz 2011",
+   "texto": "Ganz, Marshall. 2011. \"Public Narrative, Collective Action, and Power\". En Accountability through Public Opinion: From Inertia to Public Action, editado por Sina Odugbemi y Taeku Lee, 273-289. Washington, D.C.: World Bank.",
+   "doi": "https://doi.org/10.1596/9780821385050_ch18"
+  },
+  {
+   "id": "T13",
+   "corto": "Green y Gerber 2019",
+   "texto": "Green, Donald P. y Alan S. Gerber. 2019. Get Out the Vote: How to Increase Voter Turnout. 4.ª ed. Washington, D.C.: Brookings Institution Press. / Gerber, Alan S. y Donald P. Green. 2000. \"The Effects of Canvassing, Telephone Calls, and Direct Mail on Voter Turnout: A Field Experiment\". American Political Science Review 94 (3): 653-663.",
+   "doi": "https://doi.org/10.5040/9780815750642"
+  },
+  {
+   "id": "T14",
+   "corto": "Kalla y Broockman 2018",
+   "texto": "Kalla, Joshua L. y David E. Broockman. 2018. \"The Minimal Persuasive Effects of Campaign Contact in General Elections: Evidence from 49 Field Experiments\". American Political Science Review 112 (1): 148-166.",
+   "doi": "https://doi.org/10.1017/S0003055417000363"
+  },
+  {
+   "id": "T15",
+   "corto": "Gerber, Gimpel, Green y Shaw 2011",
+   "texto": "Gerber, Alan S., James G. Gimpel, Donald P. Green y Daron R. Shaw. 2011. \"How Large and Long-lasting Are the Persuasive Effects of Televised Campaign Ads? Results from a Randomized Field Experiment\". American Political Science Review 105 (1): 135-150.",
+   "doi": "https://doi.org/10.1017/S000305541000047X"
+  },
+  {
+   "id": "T16",
+   "corto": "Coppock, Hill y Vavreck 2020",
+   "texto": "Coppock, Alexander, Seth J. Hill y Lynn Vavreck. 2020. \"The Small Effects of Political Advertising Are Small Regardless of Context, Message, Sender, or Receiver: Evidence from 59 Real-Time Randomized Experiments\". Science Advances 6 (36).",
+   "doi": "https://doi.org/10.1126/sciadv.abc4046"
+  },
+  {
+   "id": "T17",
+   "corto": "Issenberg 2012",
+   "texto": "Issenberg, Sasha. 2012. The Victory Lab: The Secret Science of Winning Campaigns. Nueva York: Crown.",
+   "doi": null
+  },
+  {
+   "id": "T18",
+   "corto": "Hersh 2015",
+   "texto": "Hersh, Eitan D. 2015. Hacking the Electorate: How Campaigns Perceive Voters. Cambridge: Cambridge University Press.",
+   "doi": "https://doi.org/10.1017/CBO9781316212783"
+  },
+  {
+   "id": "T19",
+   "corto": "Izurieta, Perina y Arterton (comps.) 2009",
+   "texto": "Izurieta, Roberto, Rubén M. Perina y Christopher Arterton, comps. 2009. Estrategias de comunicación para gobiernos. Buenos Aires: La Crujía.",
+   "doi": null
+  },
+  {
+   "id": "T20",
+   "corto": "Mayhew 1974",
+   "texto": "Mayhew, David R. 1974. Congress: The Electoral Connection. New Haven: Yale University Press.",
+   "doi": null
+  },
+  {
+   "id": "T21",
+   "corto": "Fenno 1978",
+   "texto": "Fenno, Richard F., Jr. 1978. Home Style: House Members in Their Districts. Boston: Little, Brown.",
+   "doi": null
+  },
+  {
+   "id": "T24",
+   "corto": "Aggarwal et al. 2023",
+   "texto": "Aggarwal, Minali, Jennifer Allen, Alexander Coppock, Dan Frankowski et al. 2023. \"A 2 Million-Person, Campaign-Wide Field Experiment Shows How Digital Advertising Affects Voter Turnout\". Nature Human Behaviour 7 (3): 332-341.",
+   "doi": "https://doi.org/10.1038/s41562-022-01487-4"
+  },
+  {
+   "id": "R2.2",
+   "corto": "Nickerson 2008",
+   "texto": "Nickerson, David W. 2008. \"Is Voting Contagious? Evidence from Two Field Experiments\". American Political Science Review 102 (1): 49-57.",
+   "doi": "https://doi.org/10.1017/S0003055408080039"
+  },
+  {
+   "id": "R3.1",
+   "corto": "Grimmer et al. 2012",
+   "texto": "Grimmer, Justin, Solomon Messing y Sean J. Westwood. 2012. \"How Words and Money Cultivate a Personal Vote: The Effect of Legislator Credit Claiming on Constituent Credit Allocation\". American Political Science Review 106 (4): 703-719.",
+   "doi": "https://doi.org/10.1017/S0003055412000457"
+  },
+  {
+   "id": "R3.2",
+   "corto": "Fujiwara y Wantchekon 2013",
+   "texto": "Fujiwara, Thomas y Leonard Wantchekon. 2013. \"Can Informed Public Deliberation Overcome Clientelism? Experimental Evidence from Benin\". American Economic Journal: Applied Economics 5 (4): 241-255.",
+   "doi": "https://doi.org/10.1257/app.5.4.241"
+  },
+  {
+   "id": "R3.3",
+   "corto": "Stokes et al. 2013",
+   "texto": "Stokes, Susan C., Thad Dunning, Marcelo Nazareno y Valeria Brusco. 2013. Brokers, Voters, and Clientelism: The Puzzle of Distributive Politics. Cambridge: Cambridge University Press.",
+   "doi": "https://doi.org/10.1017/CBO9781107324909"
+  },
+  {
+   "id": "R3.4",
+   "corto": "Lewis-Beck y Stegmaier 2000; Healy y Malhotra 2013",
+   "texto": "Lewis-Beck, Michael S. y Mary Stegmaier. 2000. \"Economic Determinants of Electoral Outcomes\". Annual Review of Political Science 3: 183-219. / Healy, Andrew y Neil Malhotra. 2013. \"Retrospective Voting Reconsidered\". Annual Review of Political Science 16: 285-306.",
+   "doi": "https://doi.org/10.1146/annurev.polisci.3.1.183"
+  },
+  {
+   "id": "R3.5",
+   "corto": "Jost et al. 2004; Kahneman y Tversky 1979",
+   "texto": "Jost, John T., Mahzarin R. Banaji y Brian A. Nosek. 2004. \"A Decade of System Justification Theory: Accumulated Evidence of Conscious and Unconscious Bolstering of the Status Quo\". Political Psychology 25 (6): 881-919. / Kahneman, Daniel y Amos Tversky. 1979. \"Prospect Theory: An Analysis of Decision under Risk\". Econometrica 47 (2): 263-291.",
+   "doi": "https://doi.org/10.1111/j.1467-9221.2004.00402.x"
+  }
+ ],
+ "advertencias": [
+  "Las referencias están verificadas por ficha (autor, año, título y DOI), no por lectura completa: antes de citar una cifra frente a alguien, se abre la fuente.",
+  "Casi toda la evidencia experimental es de Estados Unidos, donde es público quién votó. En Colombia no lo es: se trasladan principios, no guiones.",
+  "Los anuncios movieron poco las preferencias sin importar a quién iban dirigidos (Coppock, Hill y Vavreck 2020): la modulación por arquetipo pesa en el contacto personal y en la agenda, no en la pauta."
+ ]
+};
