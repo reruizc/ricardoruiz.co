@@ -164,7 +164,10 @@ MANUAL = {
 # de cargos se publica sin nombre. Fecha = la del titular que lo confirma.
 VOCEROS = {
  'supersociedades':  ('Julia Eva Pretelt',     '2026-09-02', 'se posesionó como superintendente de Sociedades'),
- 'minsalud':         ('Juan Carlos Aveiga',    '2026-09-05', 'ministro de Salud'),
+# ⚠ 10-nov-2026: aquí estuvo «Juan Carlos Aveiga» como ministro de Salud, y es el
+# ministro de Salud de ECUADOR (lo nombró Noboa el 10-jul). El titular no decía
+# «Ecuador» y el detector de prensa extranjera no lo atajó. Un nombre entra solo
+# si el titular dice el país o la entidad colombiana sin ambigüedad.
  'mineducacion':     ('Ilva Myriam Hoyos',     '2026-09-03', 'ministra de Educación'),
  'cancilleria':      ('Omar Bula',             '2026-09-05', 'canciller · posesionó a los embajadores en EE. UU. y ONU'),
  'procuraduria':     ('Gregorio Eljach',       '2026-09-04', 'procurador general'),

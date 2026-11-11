@@ -6,6 +6,7 @@
 # cuando los tenga, esto se mueve a Lambda y deja de depender del Mac.
 
 export PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../caudal/salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 REPO="/Users/ricardoruiz/ricardoruiz.co"
 OUT="$REPO/Bases de datos/pronosticos"
 S3="s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/pronosticos"

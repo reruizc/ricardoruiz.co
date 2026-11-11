@@ -12,6 +12,7 @@ CFG="$HOME/.config/gastos/gastos.env"
 
 # aws y python3 viven en homebrew; launchd no hereda el PATH de la terminal.
 export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../caudal/salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 
 mkdir -p "$(dirname "$LOG")"
 

@@ -2,8 +2,8 @@
    salen del pie de página del sitio oficial de cada entidad. */
 window.CAUDAL_VOCEROS = {
 "meta": {
-"voceros_confirmados": 8,
-"v": "2026-09-04",
+"voceros_confirmados": 7,
+"v": "2026-11-10",
 "n": 94,
 "verificados_sitio": 80,
 "manual": 9,
@@ -61,8 +61,8 @@ window.CAUDAL_VOCEROS = {
 ],
 "sitio": "https://www.minsalud.gov.co",
 "cargo": "Ministro(a) de Salud",
-"vocero": "Juan Carlos Aveiga",
-"vocero_fuente": "prensa · 2026-09-05",
+"vocero": "",
+"vocero_fuente": "",
 "redes": {
 "x": "MinSaludCol",
 "instagram": "minsaludcol",

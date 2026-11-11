@@ -12,6 +12,7 @@ set -uo pipefail
 
 # aws y python3 viven en /opt/homebrew/bin y launchd arranca con un PATH mínimo.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 
 REPO="${CAUDAL_REPO:-/Users/ricardoruiz/ricardoruiz.co}"   # la instancia EC2 lo pasa por el crontab
 AQUI="$REPO/tools/caudal/alertas"

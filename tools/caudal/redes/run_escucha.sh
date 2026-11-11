@@ -6,6 +6,7 @@
 # ESCUCHA_PERFILES: presets con escucha contratada, separados por espacio.
 set -u
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 LOG="$REPO/Bases de datos/leyes-senado/redes/escucha/escucha.log"
 mkdir -p "$(dirname "$LOG")"

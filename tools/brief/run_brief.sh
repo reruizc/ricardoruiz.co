@@ -6,6 +6,7 @@
 
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../caudal/salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 
 REPO="${CAUDAL_REPO:-/Users/ricardoruiz/ricardoruiz.co}"   # la instancia EC2 lo pasa por el crontab
 AQUI="$REPO/tools/brief"

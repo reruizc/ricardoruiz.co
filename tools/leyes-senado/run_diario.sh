@@ -18,6 +18,7 @@
 #   ordenes_senado_plenaria     ídem `plenaria`           secretariasenado.gov.co
 #   secop_fetch/build/upload  harvest_secop.py            agregados de SECOP II
 #   red_lista                 salud/espera_red.py         ¿esta máquina tiene red? (el Mac despierta tarde)
+#   python_paquetes           python3 -c import …         el python del runner trae pypdf, pymupdf y openpyxl
 #   sucop_fetch/build/upload_*  harvest_sucop.py          consulta pública de normas (el dato que VENCE)
 #   bloqueo_build/upload      build_bloqueo_s3.py         índice de agendamientos
 #   citaciones_extrae/build/upload  harvest_citaciones.py  control político por congresista
@@ -56,6 +57,8 @@
 # baja SOLO los PDFs nuevos, así que reintentos suaves no reactivan el ban.
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+SCRIPT_DIR_PY=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$SCRIPT_DIR_PY/../caudal/salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO="${CAUDAL_REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 DIARIO="$REPO/Bases de datos/leyes-senado/diario"
@@ -201,6 +204,13 @@ etapa() {
   # Espera hasta ~5 min a que vuelva; si no vuelve, no tiene sentido correr 60
   # etapas que van a fallar todas. Ver tools/caudal/salud/espera_red.py.
   # 480: las esperas suman 245 s y los sondeos hasta 128 más (ver espera_red.py).
+  # Si al python del runner le faltan los paquetes de leer PDF y Excel, las etapas
+  # que los usan fallan por dentro con rc=0 (pasó del 9 al 10-nov-2026). Esta
+  # etapa falla en voz alta para que la salud del pipeline lo marque.
+  etapa --nombre python_paquetes --timeout 60 \
+        --desc "python3 trae pypdf, pymupdf y openpyxl" \
+        -- python3 -c "import pypdf, fitz, openpyxl, sys; print(sys.version.split()[0])"
+
   etapa --nombre red_lista --critica --timeout 480 \
         --desc "¿hay red? (launchd dispara con el Mac despertando)" \
         -- python3 tools/caudal/salud/espera_red.py

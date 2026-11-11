@@ -5,6 +5,7 @@
 # salga con los registros del día y la conversación en X.
 set -u
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../salud/python_fijo.sh"   # python3 → 3.14 (Homebrew pasó a 3.15 sin paquetes)
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 LOG="$REPO/Bases de datos/caudal-briefs/publicar.log"
 mkdir -p "$(dirname "$LOG")"
