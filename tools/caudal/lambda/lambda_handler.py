@@ -3754,7 +3754,11 @@ _MEDIOS_INSTITUCIONAL_RE = re.compile(
     r'|personeria|contraloria|procuraduria|defensoria|^concejo|^asamblea'
     r'|^sena$|^dian$|presidenciadelarepublica|^super(intendencia|salud'
     r'|financiera|sociedades|transporte|servicios)|policianacional'
-    r'|ejercitonacional|unidadnacional|agencianacional|registraduria')
+    r'|ejercitonacional|unidadnacional|agencianacional|registraduria'
+    # las cuentas «MINTIC Colombia», «MinSalud»… (no un ^min a secas: Minuto30)
+    r'|^min(tic|salud|trabajo|hacienda|educacion|vivienda|ambiente|cultura|deporte'
+    r'|agricultura|comercio|minas|energia|transporte|justicia|defensa|interior'
+    r'|igualdad|ciencia)')
 
 
 def _medios_es_institucional(medio):
@@ -3842,13 +3846,18 @@ def _medios_parse_date(raw):
     return dt.isoformat()
 
 
-def _medios_gn_url(q, dias):
+def _medios_gn_url(q, dias, pais=True):
     # `gl=CO` solo SESGA el resultado a Colombia, no lo restringe — términos
     # genéricos (p.ej. "sistema financiero", "salario minimo") matchean prensa
     # de cualquier país hispanohablante. Forzar "Colombia" en la query (si el
     # término no la trae ya) lo vuelve un AND real, sin tocar búsquedas ya
     # específicas ("seguridad Catatumbo", "reforma pensional Colombia"...).
-    if 'colombia' not in q.lower():
+    # (nov-2026) NO cuando la consulta nombra una empresa del diccionario: su
+    # nombre ya acota, y el AND con «Colombia» dejaba fuera prensa colombiana que
+    # no repite el país (Comfama 36 → 25: Semana, Valora) y toda la cobertura
+    # internacional que sí le importa al cliente (Binance 100 → 34, sin BBC, DW
+    # ni EL PAÍS sobre el hackeo). Lo extranjero queda marcado con `exterior`.
+    if pais and 'colombia' not in q.lower():
         q = f'{q} Colombia'
     qq = f'{q} when:{dias}d' if dias else q
     qs = urllib.parse.urlencode({'q': qq, 'hl': 'es-419', 'gl': 'CO', 'ceid': 'CO:es'})
@@ -3942,15 +3951,25 @@ def _medios_es_exterior(titulo, medio):
 
 
 def _medios_query_events(query, dias):
+    emps = empresas.empresas_en(query or '')
     try:
-        items = _medios_parse_feed(_medios_fetch_xml(_medios_gn_url(query, dias)))
+        items = _medios_parse_feed(_medios_fetch_xml(_medios_gn_url(query, dias, pais=not emps)))
     except Exception as e:
         print(f'[medios] FAIL "{query}": {type(e).__name__}: {e}')
         return []
+    # la empresa no es prensa de sí misma: binance.com metía cotizaciones
+    # («TRX/COP») y códigos de referido como si fueran notas
+    propias = {_medios_compact(a) for e in emps for a in [e.get('k', '')] + list(e.get('alias') or []) if len(a) >= 4}
     events = []
     for it in items:
         titulo, medio = _medios_split_title(it['title'], it['source'])
         if not medio or _medios_es_fuente_social(medio) or _medios_es_institucional(medio):
+            continue
+        mc = _medios_compact(medio)
+        if propias and any(mc.startswith(pc) for pc in propias):
+            continue
+        # «COMFAMA | El Colombiano» es la página de etiqueta del diario, no una nota
+        if len(re.findall(r'\w+', titulo or '')) <= 2:
             continue
         events.append({'medio': medio, 'alcance': _medios_alcance(medio), 'titulo': titulo,
                        'url': it['link'], 'fecha': (it['fecha_pub'] or '')[:10],
@@ -4335,9 +4354,23 @@ def _medios_para_empresas(emps, cap=5):
             continue
         vistos.add(k)
         out.append((hit, r))
-        if len(out) >= cap:
-            break
-    return out
+    # (nov-2026) por TURNOS entre vigiladas, en el orden del perfil (la propia
+    # empresa primero, la competencia después). Antes se cortaba por fecha y un
+    # competidor con una noticia grande llenaba los 5 cupos: en el perfil de
+    # Comfama, 4 eran la misma nota de Colsubsidio y el fallo a favor de Comfama
+    # del 10-nov quedaba fuera. Mismo criterio que _regulatorio_para_empresas.
+    por = {}
+    for hit, r in out:
+        por.setdefault(hit, []).append((hit, r))
+    turnos = []
+    while len(turnos) < cap and any(por.values()):
+        for e in emps:
+            lst = por.get(e['nombre'])
+            if lst:
+                turnos.append(lst.pop(0))
+                if len(turnos) >= cap:
+                    break
+    return turnos
 
 
 # --- Norte · oportunidades más allá de SECOP (oct-2026) -------------------
@@ -4450,7 +4483,7 @@ def _sucop_para_perfil(s, cap=4):
     hits = [r for r in _sucop()
             if (r.get('estado_consulta') in ('abierta', 'cierra_pronto')
                 or (r.get('sin_texto') and (r.get('visto') or '') >= limite))
-            and any(t in (r.get('q') or '') for t in temas)]
+            and any(_tiene(t, r.get('q') or '') for t in temas)]
     hits.sort(key=_sucop_orden)
     out = []
     for r in hits[:cap]:
@@ -4967,7 +5000,7 @@ def _secop_para_empresas(emps, cap=5):
         a = min(e['alias'], key=len) if e['alias'] else e['k']
         if a not in terms:
             terms.append(a)
-    ck = (f'secop-vigiladas-{_hash24("|".join(sorted(terms)))}-{cap}'
+    ck = (f'secop-vigiladas2-{_hash24("|".join(sorted(terms)))}-{cap}'
           f'-{_medios_cache_bucket()}')
     cached = _cache_get(ck)
     if cached:
@@ -4987,7 +5020,7 @@ def _secop_para_empresas(emps, cap=5):
     w = '(' + ' OR '.join(conds) + ')'
     filas = _secop_get({'$select': ','.join(SECOP_SELECT),
                         '$where': w + ' AND fecha_de_firma IS NOT NULL',
-                        '$order': 'fecha_de_firma DESC', '$limit': cap}, 14)
+                        '$order': 'fecha_de_firma DESC', '$limit': cap * 8}, 14)
     tot = 0
     try:
         t = _secop_get({'$select': 'count(1) as n', '$where': w}, 14)
@@ -5001,7 +5034,20 @@ def _secop_para_empresas(emps, cap=5):
                       if empresas.casa_registro(e, row.get('proveedor') or '')
                       or empresas.casa_registro(e, row.get('entidad') or '')), None)
         out.append((quien, row))
-    res = {'n': tot or len(out), 'resultados': out}
+    # (nov-2026) por turnos entre vigiladas, como la prensa: en el perfil de
+    # Comfama los 5 contratos que se mostraban eran de Cafam.
+    por = {}
+    for q_, row in out:
+        por.setdefault(q_, []).append((q_, row))
+    turnos = []
+    while len(turnos) < cap and any(por.values()):
+        for nom in [e['nombre'] for e in emps] + [None]:
+            lst = por.get(nom)
+            if lst:
+                turnos.append(lst.pop(0))
+                if len(turnos) >= cap:
+                    break
+    res = {'n': tot or len(out), 'resultados': turnos}
     _cache_put(ck, res)
     return res
 
@@ -5038,25 +5084,64 @@ def _relajar_q(q, recs, campo='q', pasa=None):
 
     def blob(r):
         return r.get(campo) or ''
-    hits = [r for r in base if all(t in blob(r) for t in toks)]
+    hits = [r for r in base if all(_tiene(t, blob(r)) for t in toks)]
     if hits:
         hits.sort(key=lambda r: r.get('fecha') or '', reverse=True)
         return hits, {'modo': 'palabras', 'anchor': toks, 'sin_coincidencia': [],
                       'n_estricto': 0, 'n_total': len(hits)}
     cand = [t for t in toks if not t.isdigit()]
-    df = {t: sum(1 for r in base if t in blob(r)) for t in cand}
+    df = {t: sum(1 for r in base if _tiene(t, blob(r))) for t in cand}
     con = [t for t in cand if df[t] > 0]
     if not con:
         return None, None
+    # (nov-2026) Si la palabra que DEFINE la consulta no aparece, anclar en otra
+    # devolvía relleno: «ley de rescate» traía 700 registros por «ley» y
+    # «activos virtuales» 138 de «lavado de activos». Una palabra larga ausente
+    # o un ancla que sale en más del 5 % del universo → cero, no relleno.
+    if any(df[t] == 0 and len(t) >= 5 for t in cand):
+        return None, None
     anchor = min(con, key=lambda t: df[t])
-    hits = [r for r in base if anchor in blob(r)]
+    if base and df[anchor] > max(20, 0.05 * len(base)):
+        return None, None
+    hits = [r for r in base if _tiene(anchor, blob(r))]
     otros = [t for t in toks if t != anchor]
-    sin = [t for t in otros if not any(t in blob(r) for r in hits)]
+    sin = [t for t in otros if not any(_tiene(t, blob(r)) for r in hits)]
     hits.sort(key=lambda r: r.get('fecha') or '', reverse=True)
-    hits.sort(key=lambda r: -sum(1 for t in toks if t in blob(r)))
+    hits.sort(key=lambda r: -sum(1 for t in toks if _tiene(t, blob(r))))
     return hits, {'modo': 'ancla', 'anchor': [anchor], 'sin_coincidencia': sin,
                   'con': [t for t in otros if t not in sin],
                   'n_estricto': 0, 'n_total': len(hits)}
+
+
+def _tiene(term, blob):
+    """¿`term` aparece al INICIO de una palabra de `blob`? (nov-2026)
+
+    Los pilares buscaban por subcadena y eso mentía: «dian» casaba dentro de
+    «mediante» (320 consultas SUCOP, 1.372 providencias de Control, 131 sanciones
+    falsas), «uber» dentro de «tuberosas» y el tema «pension» dentro de
+    «suspension» (468 de 747 actos de un radar). Se exige inicio de palabra y se
+    deja libre el final, así «pension» sigue casando «pensiones»."""
+    if not term or not blob:
+        return False
+    # una sigla o palabra corta va completa: «dian» no es «Diana», «sic» no es «sicario»
+    entera = len(term) <= 4
+    i = blob.find(term)
+    while i != -1:
+        j = i + len(term)
+        if (i == 0 or not blob[i - 1].isalnum()) and (not entera or j >= len(blob) or not blob[j].isalnum()):
+            return True
+        i = blob.find(term, i + 1)
+    return False
+
+
+def _casa_q(q, blob):
+    """La consulta casa por inicio de palabra, o por el nombre largo si es una
+    sigla de `_DO_SIGLAS` («superfinanciera» → «superintendencia financiera»:
+    sin esto daba 0 en SUCOP y 6 sanciones de 2019 en Regulatorio)."""
+    if _tiene(q, blob):
+        return True
+    largo = _DO_SIGLAS.get(q)
+    return bool(largo) and _tiene(largo, blob)
 
 
 def _fold_q(s):
@@ -5558,7 +5643,7 @@ def handler(event, context):
             return _resp(200, dict(_control_stats(), mode='stats'))
         recs = [r for r in _control()
                 if (not fuente or r.get('fuente') == fuente)
-                and (not q or q in r.get('q', ''))]
+                and (not q or _casa_q(q, r.get('q', '')))]
         out = [{k: v for k, v in r.items() if k != 'q'}
                for r in sorted(recs, key=lambda r: r.get('fecha', ''), reverse=True)[:120]]
         # La COBERTURA viaja también en la búsqueda, no solo en el landing: sin
@@ -5593,7 +5678,7 @@ def handler(event, context):
                 if (not sector or r.get('sector') == sector)
                 and (not q
                      or (empresas.casa_registro_any(emps, r.get('sancionado', ''))
-                         if emps else q in r.get('q', '')))]
+                         if emps else _casa_q(q, r.get('q', ''))))]
         # búsqueda flexible (sep-2026), mismo criterio que Ejecutivo. Nunca con
         # empresa: ahí el match es de identidad y relajarlo traería homónimos.
         flexible = None
@@ -5618,7 +5703,7 @@ def handler(event, context):
                         and (not sector or r.get('sector') == sector)
                         and (not q
                              or (empresas.casa_registro_any(emps, r.get('sancionado', ''))
-                                 if emps else q in r.get('q', ''))))
+                                 if emps else _casa_q(q, r.get('q', '')))))
         return _resp(200, {
             'mode': 'search', 'query': body.get('query', ''), 'sector': sector,
             'tipo_acto': tipo_acto,
@@ -5650,7 +5735,7 @@ def handler(event, context):
         hits = [r for r in recs
                 if (not tipo or (r.get('tipo') or '').upper() == tipo)
                 and (not q
-                     or q in r.get('q', '')
+                     or _casa_q(q, r.get('q', ''))
                      or (vocab and any(v in empresas._n(r.get('q', '')) for v in vocab)))]
         # búsqueda flexible (sep-2026): el AND de varias palabras no puede dejar
         # en cero lo que sí existe por la palabra específica. Solo sin empresa
@@ -5686,9 +5771,12 @@ def handler(event, context):
                 if (not corp or corp in _fold_q(r.get('corporacion') or ''))
                 and (not tipo or r.get('tipo') == tipo)
                 and (not solo_vivos or r.get('en_tramite'))
-                and (not toks or all(t in (r.get('q') or '') for t in toks))]
-        hits.sort(key=lambda r: ((r.get('anio') or ''), int(r['numero']) if (r.get('numero') or '').isdigit() else 0,
-                                 r.get('fecha') or ''), reverse=True)
+                and (not toks or all(_tiene(_DO_SIGLAS.get(t, t), r.get('q') or '') or _tiene(t, r.get('q') or '') for t in toks))]
+        # por FECHA: cada corporación numera a su manera (la Alcaldía con
+        # radicados de 13 dígitos), así que año + número ponía un acto del 19-oct
+        # por encima de uno del 4-nov y el Concejo del día al fondo
+        hits.sort(key=lambda r: (r.get('fecha') or '', (r.get('anio') or ''),
+                                 int(r['numero']) if (r.get('numero') or '').isdigit() else 0), reverse=True)
         hoy = datetime.date.today().isoformat()
         ev = sorted([e for e in _entidades_jsonl('eventos')
                      if e.get('fuente') in ('concejo-medellin', 'asamblea-antioquia') and (e.get('dia') or '') >= hoy
@@ -5727,7 +5815,7 @@ def handler(event, context):
                 continue
             if ent and ent not in r['_e']:
                 continue
-            if toks and not all(t in r['_q'] for t in toks):
+            if toks and not all(_tiene(t, r['_q']) or _tiene(_DO_SIGLAS.get(t, ''), r['_q']) for t in toks):
                 continue
             hits.append(r)
         hits.sort(key=lambda r: ((r.get('publicacion') or {}).get('fecha') or '', r.get('fecha') or ''), reverse=True)
@@ -5864,7 +5952,7 @@ def handler(event, context):
                 return False
             if not q or not con_q:
                 return True
-            return (q in (r.get('q') or '')
+            return (_casa_q(q, r.get('q') or '')
                     or (tops and tops.intersection(r.get('topicos') or [])))
 
         hits = [r for r in recs if _pasa(r)]
@@ -6253,7 +6341,7 @@ def handler(event, context):
                 if id(r) in vistos:
                     continue
                 blob = r.get('q') or ''
-                if any(t in blob for t in temas_reg):
+                if any(_tiene(t, blob) for t in temas_reg):
                     dels.append(r)
                     vistos.add(id(r))
         if dels:

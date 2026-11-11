@@ -200,7 +200,7 @@ _RAW = [
     ('mutualser', 'Mutual SER', 'salud', 'mutual ser', 'salud / EPS e IPS', '', ''),
     ('saviasalud', 'Savia Salud', 'salud', 'savia salud', 'salud / EPS e IPS', '', ''),
     ('medimas', 'Medimás', 'salud', 'medimas', 'salud / EPS e IPS', '', ''),
-    ('colsubsidio', 'Colsubsidio', 'salud', 'colsubsidio', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', ''),
+    ('colsubsidio', 'Colsubsidio', 'salud', 'colsubsidio', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', 'caja colombiana de subsidio familiar colsubsidio', ''),
     # 'avenida cafam' es una vía de Melgar (Tolima): medido oct-2026, traía un
     # homicidio en esa avenida al radar de Comfama como «Cafam en prensa».
     ('cafam', 'Cafam', 'salud', 'cafam', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', 'avenida cafam|av cafam'),
@@ -449,9 +449,11 @@ _RAW = [
     ('sos', 'EPS SOS', 'salud', 'eps sos|servicio occidental de salud', 'salud / EPS e IPS', '', ''),
     ('aliansalud', 'Aliansalud', 'salud', 'aliansalud', 'salud / EPS e IPS', '', ''),
     ('ecoopsos', 'Ecoopsos', 'salud', 'ecoopsos', 'salud / EPS e IPS', '', ''),
-    ('comfenalco', 'Comfenalco', 'salud', 'comfenalco', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', ''),
-    ('comfandi', 'Comfandi', 'salud', 'comfandi', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', ''),
-    ('comfama', 'Comfama', 'salud', 'comfama', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS,vivienda y construccion', '', ''),
+    ('comfenalco', 'Comfenalco', 'salud', 'comfenalco', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', 'comfenalco antioquia', ''),
+    ('comfandi', 'Comfandi', 'salud', 'comfandi', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', 'caja de compensacion del valle del cauca comfamiliar andi comfandi', ''),
+    # Razón social tal como sale en SECOP II (medido 10-nov-2026): sin este campo la
+    # caja quedaba en 0 contratos y la página llamaba «homónimo» a la propia caja.
+    ('comfama', 'Comfama', 'salud', 'comfama', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS,vivienda y construccion', 'caja de compensacion familiar de antioquia comfama', ''),
     ('santafe', 'Fundación Santa Fe', 'salud', 'fundacion santa fe', 'salud / EPS e IPS', '', ''),
     ('country', 'Clínica del Country', 'salud', 'clinica del country', 'salud / EPS e IPS', '', ''),
     ('mederi', 'Méderi', 'salud', 'mederi', 'salud / EPS e IPS', '', ''),
