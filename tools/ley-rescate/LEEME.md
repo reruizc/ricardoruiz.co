@@ -10,8 +10,11 @@ articulos.json      los 106 artículos con página y tema · lo genera build_art
 hitos.json          bitácora curada a mano. Un hito con "etapa":"pon|inf|anu|c1|p2|c3|p4|con|san" marca esa etapa como hecha
 verificaciones.json lo que dijo un actor contra el texto radicado (Tabla 14, p. 204). El hub pinta la más reciente
 voces.json          declaraciones verificadas una por una (p: a apoya · r rechaza · m reparos · i sin definir · g: con congreso · pub público · pri privado · n: nivel 5-2 del eje de poder · k: rótulo corto · al: nombres para contar menciones)
+                    ⚠ g, n y k son obligatorios en cada voz: sin ellos se cae ley-de-rescate-fuerzas.html (pasó el 10-nov).
 personas.json       fotos y créditos · lo genera build_personas.py (foto oficial de Senado y Cámara; Wikipedia solo con licencia libre)
 votos.json          bancadas de las Comisiones Terceras y su postura inicial. Solo se marca sí/no si habló la bancada
+                    ⚠ La plantilla del Senado sale de la ficha de la Comisión Tercera (/commissions), no del commission_id de
+                    cada senador: venía dañado para dos de los 15 y la gráfica mostró 13 (build_personas.py aborta si no cuadra).
 redes.mjs           X, TikTok, Instagram y Facebook por Apify → redes-crudo.json. Reusa los actores de candidato-360/escucha/perfil.mjs
 rastreo.py          trámite + prensa + clasificación + cálculo → estado.json
 .github/workflows/ley-rescate-rastreo.yml   corrida diaria, 06:15 de Bogotá
