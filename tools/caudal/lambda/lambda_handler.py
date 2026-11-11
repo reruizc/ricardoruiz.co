@@ -981,6 +981,25 @@ def _es_acto_interno(texto):
     return bool(_ACTO_ARRANQUE_RE.search(t) and _ACTO_INTERNO_RE.search(t))
 
 
+
+# Decretos de personal de Presidencia (nombramientos, renuncias de notarios,
+# encargos, extradiciones, ascensos): ~5.800 de 12.155 en normativa.jsonl, sin
+# marca de «administrativo» porque ese índice es anterior a la marca. Se busca
+# el SUSTANTIVO de personal, no el verbo: «se efectúa un ajuste al Presupuesto»
+# o «se retira la subpartida arancelaria» no son personal.
+_DECRETO_PERSONAL_RE = re.compile(
+    r'^\W*por (?:medio )?(?:del|de la|el|la|e.) (?:cua.? )?se .{0,45}?'
+    r'(nombramiento|nornbramiento|nompramiento|\bnombra\b|renuncia|encargo|\bencarga\b'
+    r'|\bdesigna\b|designacion|designan|traslad|ascien|ascenso|insubsisten|extradicion|vacaciones|vinculacion'
+    r'|comision de servicios|retiro del servicio|retira del servicio|condecora|\bposesion\b|licencia ordinaria)')
+_DECRETO_NO_PERSONAL_RE = re.compile(r'presupuest|arancel|subpartida|regimen|reglament|tarifa|liquidacion de|punto focal|centro nacional')
+
+
+def _es_decreto_personal(r):
+    d = _unicodedata.normalize('NFKD', (r.get('descripcion') or '')[:220]).encode('ascii', 'ignore').decode().lower()
+    return bool(_DECRETO_PERSONAL_RE.search(d)) and not _DECRETO_NO_PERSONAL_RE.search(d)
+
+
 def _sanciones():
     """Lista slim de sanciones (lazy — solo cuando se busca). Cache warm."""
     global _SANC
@@ -5818,7 +5837,7 @@ def handler(event, context):
         # entran si se piden o si se busca un número exacto.
         con_admin = bool(body.get('administrativos')) or bool(re.fullmatch(r'\d{2,6}', q.strip()))
         if not con_admin:
-            recs = [r for r in recs if not r.get('administrativo')]
+            recs = [r for r in recs if not r.get('administrativo') and not _es_decreto_personal(r)]
         hits = [r for r in recs
                 if (not tipo or (r.get('tipo') or '').upper() == tipo)
                 and (not q
