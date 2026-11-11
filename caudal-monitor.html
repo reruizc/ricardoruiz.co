@@ -156,7 +156,7 @@
       <div class="mo-search"><input id="sg-q" type="search" placeholder="Busca un proyecto de esta legislatura por número o palabras (477, rescate, plataformas…)" /></div>
       <ul class="mo-res" id="sg-res"></ul>
       <div id="sg-lista"></div>
-      <div class="cob-note">Por ahora la lista de seguidos se guarda en este navegador.</div>
+      <div class="cob-note" id="sg-nota">La lista de seguidos se guarda en tu cuenta de Caudal; sin sesión, solo en este navegador.</div>
     </section>
 
     <div class="foot">
@@ -179,7 +179,24 @@
   const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
   let D=null, ORD=null, POR_K={}, CLIENTES=[], ACT=null, TERMS=[], MV_TIPO='decisiones';
   let SIGO=[]; try{ SIGO=JSON.parse(localStorage.getItem(LS)||'[]'); }catch(e){ SIGO=[]; }
-  const guardar=()=>{ try{ localStorage.setItem(LS,JSON.stringify(SIGO)); }catch(e){} };
+  /* Seguidos: en la cuenta (worker /caudal/seguidos) cuando hay sesión, con
+     copia en el navegador. Al entrar se juntan las dos listas. */
+  const WK='https://rr-auth.reruizc.workers.dev/caudal/seguidos';
+  function wk(body){
+    const t=localStorage.getItem('rr-token'); if(!t) return Promise.reject(new Error('sin sesión'));
+    return fetch(WK,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},...(body?{body:JSON.stringify(body)}:{})}).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status)));
+  }
+  let EN_CUENTA=false;
+  const guardar=()=>{ try{ localStorage.setItem(LS,JSON.stringify(SIGO)); }catch(e){} if(EN_CUENTA) wk({ks:SIGO}).catch(()=>{}); };
+  async function cargarSeguidos(){
+    if(!window.HAS_SESSION) return;
+    try{
+      const r=await wk(); EN_CUENTA=true;
+      const junta=[...new Set([...(r.ks||[]),...SIGO])];
+      if(junta.length!==(r.ks||[]).length){ SIGO=junta; guardar(); } else SIGO=junta;
+      try{ localStorage.setItem(LS,JSON.stringify(SIGO)); }catch(e){}
+    }catch(e){ EN_CUENTA=false; }
+  }
 
   /* «477 de 2026 Cámara» · «477/2026C» · «328/26» → «C477-26» */
   function clave(num,camDef){
@@ -223,7 +240,7 @@
     D.proyectos.forEach(p=>p.ks.forEach(k=>POR_K[k]=p));
     const v=new Date(D.v), vo=ORD.v?new Date(ORD.v):null;
     est.textContent=`Registro de proyectos al ${v.toLocaleDateString('es-CO',{day:'numeric',month:'long'})} · agenda al ${vo?vo.toLocaleDateString('es-CO',{day:'numeric',month:'long'}):'—'} · ${D.n_proyectos} proyectos de la legislatura ${D.legislatura}.`;
-    await cargarClientes();
+    await Promise.all([cargarClientes(), cargarSeguidos()]);
     pintarBarra(); pintarTodo(); wire();
   }
 
