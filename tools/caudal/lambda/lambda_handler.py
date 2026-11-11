@@ -2192,7 +2192,7 @@ def _contratacion(body):
     # devuelve el universo $q crudo — ampliar es perder precisión, acá también.
     emps = empresas.empresas_en(query) if query else []
     por_identidad = bool(emps) and not body.get('ampliar_empresa')
-    ck = ('contratacion-' + _hash24(json.dumps(
+    ck = ('contratacion2-' + _hash24(json.dumps(
         ['v3-proc', query, where, limit, orden, solo_objeto, por_identidad],
         ensure_ascii=False, sort_keys=True))
         + f'-{_medios_cache_bucket(3)}')
@@ -4092,7 +4092,7 @@ def _medios_relajar(query):
 
 def _medios_buscar(query, dias):
     dias = dias or 30
-    ck = f'medios-q-{_hash24(_medios_norm(query))}-{dias}-{_medios_cache_bucket()}'
+    ck = f'medios-q2-{_hash24(_medios_norm(query))}-{dias}-{_medios_cache_bucket()}'
     cached = _cache_get(ck)
     if cached:
         return cached
@@ -4121,7 +4121,7 @@ def _medios_para_sector(temas, dias=14, cap=6):
     temas (mismo criterio que _medios_landing/_medios_buscar)."""
     if not temas:
         return {'n': 0, 'resultados': []}
-    ck = f'medios-sector-{_hash24("|".join(sorted(temas)))}-{dias}-{_medios_cache_bucket()}'
+    ck = f'medios-sector3-{_hash24("|".join(sorted(temas)))}-{dias}-{cap}-{_medios_cache_bucket()}'
     cached = _cache_get(ck)
     if cached:
         return cached
@@ -4337,7 +4337,10 @@ def _medios_para_empresas(emps, cap=5):
     if not emps:
         return []
     nombres = [e['nombre'] for e in emps]
-    agg = _medios_para_sector(nombres, dias=PERFIL_MEDIOS_DIAS, cap=cap * 4)
+    # cap amplio: el corte es por fecha sobre TODAS las vigiladas juntas, y un
+    # competidor con una crisis (Colsubsidio-Sanitas, nov-2026) copaba los 20
+    # primeros y la propia empresa no alcanzaba a entrar a los turnos
+    agg = _medios_para_sector(nombres, dias=PERFIL_MEDIOS_DIAS, cap=cap * 16)
     out, vistos = [], set()
     for r in agg.get('resultados', []):
         titulo = r.get('titulo') or ''
@@ -5000,7 +5003,7 @@ def _secop_para_empresas(emps, cap=5):
         a = min(e['alias'], key=len) if e['alias'] else e['k']
         if a not in terms:
             terms.append(a)
-    ck = (f'secop-vigiladas2-{_hash24("|".join(sorted(terms)))}-{cap}'
+    ck = (f'secop-vigiladas3-{_hash24("|".join(sorted(terms)))}-{cap}'
           f'-{_medios_cache_bucket()}')
     cached = _cache_get(ck)
     if cached:
@@ -6262,7 +6265,11 @@ def handler(event, context):
             s = caudal_core.sector_cliente(sk)
             if not s:
                 return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
-        emps_vig = [e for e in empresas.EMPRESAS if e['k'] in set(s.get('empresas_keys') or [])]
+        # en el ORDEN DEL PERFIL (la empresa del cliente primero), no en el del
+        # diccionario: con Comfama la propia caja quedaba sexta y la prensa, que
+        # busca las cinco primeras (PERFIL_EMP_MEDIOS), no la buscaba (nov-2026)
+        _pos = {k: i for i, k in enumerate(s.get('empresas_keys') or [])}
+        emps_vig = sorted((e for e in empresas.EMPRESAS if e['k'] in _pos), key=lambda e: _pos[e['k']])
         # La competencia de un perfil GUARDADO no entraba al radar: los presets la
         # suman a empresas_keys en sector_cliente, pero normalizar_perfil la deja
         # aparte. Ahora entra al Sur igual en los dos casos, y las que no están
