@@ -67,9 +67,13 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / 'tools' / 'caudal'))
 import empresas as DIC  # noqa: E402
 
-OUT = REPO / 'Bases de datos' / 'legislativo' / 'fuerzas-externas'
+# Los datos viven en «Bases de datos/» (fuera de git). Desde un worktree esa
+# carpeta no tiene los JSON: MC_DATOS apunta a la del checkout principal, o el
+# índice se reescribiría solo con lo que se armó en esa corrida.
+DATOS = Path(os.environ.get('MC_DATOS') or REPO / 'Bases de datos')
+OUT = DATOS / 'legislativo' / 'fuerzas-externas'
 CACHE = OUT / '_cache'
-INTERNAS = REPO / 'Bases de datos' / 'legislativo' / 'fuerzas-internas-2026.json'
+INTERNAS = DATOS / 'legislativo' / 'fuerzas-internas-2026.json'
 S3_DIR = 's3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/fuerzas-externas/'
 API = 'https://rr-auth.reruizc.workers.dev/caudal/api'
 ORDENES_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json'
@@ -490,8 +494,8 @@ COMUNES_TEMA = set(('region caribe pacifico andina orinoquia amazonia departamen
                     'gobierno personas familias desarrollo nacional fondo').split())
 
 
-def _consulta(P, minimo=2):
-    d = call({'action': 'medios', 'query': ' '.join(P[:4]), 'dias': DIAS}) or {}
+def _consulta(P, minimo=2, pre=''):
+    d = call({'action': 'medios', 'query': (pre + ' ' if pre else '') + ' '.join(P[:4 if not pre else 3]), 'dias': DIAS}) or {}
     raiz = [w[:6] for w in P]
     comun = {w[:6] for w in COMUNES_TEMA}
     res = []
@@ -532,6 +536,15 @@ def prensa(x):
         vistos = {r['url'] for r in res}
         res += [r for r in _consulta(P) if r['url'] not in vistos]
         usadas = usadas or P
+    # y una dirigida al TRÁMITE: «proyecto de ley» + el tema. Las dos de arriba
+    # traen la conversación del tema, donde casi nadie toma partido por el
+    # proyecto; esta trae las notas sobre la iniciativa, que es donde la
+    # postura aparece (nov-2026: 0 posturas en 94 proyectos de la agenda).
+    # El filtro es el mismo: el titular debe nombrar el tema.
+    base = usadas if len(usadas) >= 2 else (P if len(P) >= 2 else [])
+    if base:
+        vistos = {r['url'] for r in res}
+        res += [r for r in _consulta(base, pre='proyecto de ley') if r['url'] not in vistos]
     res.sort(key=lambda r: r.get('fecha') or '', reverse=True)
     return usadas, res[:30]
 
@@ -700,6 +713,8 @@ def main():
     ap.add_argument('--subir', action='store_true')
     ap.add_argument('--saltar', action='store_true', help='no rehace los que ya tienen archivo')
     ap.add_argument('--hoy', action='store_true', help='solo los proyectos del orden del día de hoy (ordenes-vigentes.json)')
+    ap.add_argument('--agenda', action='store_true',
+                    help='todos los proyectos citados en ordenes-vigentes.json desde ayer: lo de hoy y lo ya publicado para los próximos días')
     args = ap.parse_args()
 
     r = call({'action': 'radicados'}) or {}
@@ -713,8 +728,9 @@ def main():
     if args.solo:
         t = tok_num(args.solo)
         vivos = [x for x in vivos if t in (tok_num(x.get('numero_senado')), tok_num(x.get('numero_camara')))]
-    if args.hoy:
+    if args.hoy or args.agenda:
         hoy = time.strftime('%Y-%m-%d', time.gmtime(time.time() - 5 * 3600))   # Bogotá
+        ayer = time.strftime('%Y-%m-%d', time.gmtime(time.time() - 29 * 3600))
         with urllib.request.urlopen(urllib.request.Request(ORDENES_URL, headers={'User-Agent': 'mi-congreso-fuerzas'}), timeout=60) as r:
             raw = r.read()
         if raw[:2] == b'\x1f\x8b':
@@ -723,7 +739,10 @@ def main():
         O = json.loads(raw).get('ordenes') or []
         pedidos = {}
         for o in O:
-            if not (o.get('fecha') <= hoy <= (o.get('fecha_fin') or o.get('fecha'))):
+            fin_o = o.get('fecha_fin') or o.get('fecha')
+            if args.agenda and fin_o < ayer:
+                continue
+            if not args.agenda and not (o.get('fecha') <= hoy <= fin_o):
                 continue
             cam = 'S' if re.search(r'senado', o.get('corporacion') or '', re.I) else 'C'
             for pr in o.get('proyectos') or []:
@@ -732,7 +751,7 @@ def main():
                 t = tok_num(pr.get('numero'))
                 if t and pr.get('titulo'):
                     pedidos.setdefault((c, t), pr)
-        print(f'orden del día de {hoy}: {len(pedidos)} proyectos citados')
+        print(f'{"agenda desde " + ayer if args.agenda else "orden del día de " + hoy}: {len(pedidos)} proyectos citados')
 
         def clave(x):
             return ('S', tok_num(x.get('numero_senado'))) if x['_cam'] == 'Senado' else ('C', tok_num(x.get('numero_camara')))
