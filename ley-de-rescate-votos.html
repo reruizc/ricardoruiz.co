@@ -37,14 +37,14 @@
         <div class="ley"><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--informa)"></i>Sin definir</span><span><i class="pt-tsi"></i>Tiende al sí</span><span><i class="pt-tno"></i>Tiende al no</span><span style="color:var(--ink3)">Un toque: apoya · dos: rechaza · tres: sin definir</span></div></div>
       <div class="ley-pt" id="ley-pt"></div>
       <section class="bloque"><h2>Por bancada</h2><p class="sub">Un toque cambia a toda la bancada de una vez.</p><div class="blq" id="blq"></div></section>
-      <p class="aparte">La mayoría de 7 y 16 supone asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero cada comisión vota por separado. Plantillas y fotos oficiales del Senado y la Cámara.</p>
+      <p class="aparte" id="aparte">La mayoría de 8 y 16 supone asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero cada comisión vota por separado. Plantillas y fotos oficiales del Senado y la Cámara.</p>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
   <script src="ley-rescate-base.js?v=20261107"></script>
   <script>
 const ORDEN = ['pacto', 'verde', 'paz', 'lib', 'asi', 'u', 'con', 'cr', 'cd', 'sn'];
-const FILAS = { senado: { f: [[43, 84, 8], [26, 50, 5]], w: 11.2 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
+const FILAS = { senado: { f: [[43, 84, 9], [26, 50, 6]], w: 10.6 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
 const SIG = { pacto: ['PH', '#6b2d8b'], verde: ['AV', '#2e8b3e'], paz: ['Paz', '#7a6150'], lib: ['Lib', '#e0342b'], asi: ['ASI', '#e08a00'], u: ['U', '#f2a100', '#1b1b1b'], con: ['Con', '#2f6fd0'], cr: ['CR', '#8e1f1f'], cd: ['CD', '#0d2f6b'], sn: ['SN', '#c9a227', '#1b1b1b'] };
 const chip = id => { const [t, bg, fg] = SIG[id] || ['', '#666']; return `<span class="ptd" style="background:${bg};color:${fg || '#fff'}" aria-hidden="true">${t}</span>`; };
 const TD = { si: 'Tiende al sí', aj: 'Tiende al sí con ajustes', no: 'Tiende al no' };
@@ -77,6 +77,7 @@ LR.pagina('votos', E => {
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { Object.keys(V).forEach(k => delete V[k]); PRE[b.dataset.p][1](); document.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); pinta(); });
   const m0 = location.hash.match(/e=([sn.]+)/); if (m0 && m0[1].length === todos.length) { todos.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); }
   $('#copiar').onclick = async ev => { const c = todos.map(m => ({ si: 's', no: 'n', sin: '.' }[est(m)])).join(''), u = location.origin + location.pathname + '#e=' + c; history.replaceState(null, '', '#e=' + c); try { await navigator.clipboard.writeText(u); ev.target.textContent = 'Enlace copiado'; } catch { ev.target.textContent = 'Copie la dirección de esta página'; } setTimeout(() => ev.target.textContent = 'Copiar enlace del escenario', 2200); };
+  $('#aparte').textContent = $('#aparte').textContent.replace(/La mayoría de \d+ y \d+/, `La mayoría de ${camaras.senado.mayoria} y ${camaras.camara.mayoria}`);
   $('#ley-pt').innerHTML = ORDEN.map(id => `<span>${chip(id)}${esc(bl(id).nombre)}</span>`).join('');
   arma(); pinta();
 });

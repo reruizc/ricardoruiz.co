@@ -123,10 +123,24 @@ def main():
     for b in votos['bloques']:
         b['plantilla'] = {'senado': [], 'camara': []}
     por = {b['id']: b for b in votos['bloques']}
-    for s in sen:
-        if str(s.get('commission_id')) == '3':
-            n = nombre_sen(s)
-            por[bloque(s['party_name'])]['plantilla']['senado'].append(persona(n, s.get('image'), 'Senado de la República'))
+    # ⚠ La lista de integrantes sale de la ficha de la Comisión Tercera (/commissions), no del commission_id
+    # de cada senador: en nov-2026 ese campo venía dañado para dos de los 15 (Martín Caicedo, 3040; Andrea
+    # Padilla, 1016) y la gráfica mostró 13 senadores y 3 del Pacto cuando son 15 y 4.
+    com = next(c for c in json.loads(bajar('https://app.senado.gov.co/backend/api/public/v1/commissions?format=json')) if c['id'] == 3)
+    lista = [re.sub(r'\s*[—–-]\s*[^—–-]*$', '', l[1:]).strip() for l in com['description'].splitlines() if l.strip().startswith('*')]
+    sen3 = []
+    for n in lista:
+        t = [x for x in norm(n).split() if len(x) > 2]
+        hits = [s for s in sen if sum(x in norm(s['name']) for x in t) >= min(3, len(t))]
+        if len(hits) != 1:
+            raise SystemExit(f'Comisión Tercera: no casa «{n}» con un solo senador ({len(hits)})')
+        sen3.append(hits[0])
+    sueltos = [s['name'] for s in sen if str(s.get('commission_id')) == '3' and s not in sen3]
+    if sueltos:
+        raise SystemExit(f'senadores con commission_id 3 que la ficha no lista: {sueltos}')
+    for s in sen3:
+        n = nombre_sen(s)
+        por[bloque(s['party_name'])]['plantilla']['senado'].append(persona(n, s.get('image'), 'Senado de la República'))
     for r in reps:
         if 'ercera' in (r.get('Comision') or ''):
             por[bloque(r['Partido'])]['plantilla']['camara'].append(persona(r['Nombre'], r.get('Imagen'), 'Cámara de Representantes'))
