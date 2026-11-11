@@ -203,8 +203,36 @@ def fecha_iso(v):
     return str(v)[:16]
 
 
+# (nov-2026) El actor de X entrega a veces el texto con UTF-8 leído como
+# cp1252 («inflaciÃ³n», «â€œmaraÃ±onâ€�»). No era solo estético: el tema se
+# busca sobre el texto plegado y «inversiÃ³n» no casa con «inversion». Se
+# deshace el doble encode; el «�» es un byte que cp1252 no tiene (0x81, 0x8D,
+# 0x8F, 0x90, 0x9D) y se reconstruye por contexto.
+_MOJI = re.compile('[ÃÂâð][\u0080-\u00bf\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u2013-\u203a\u20ac\u2122\ufffd]')
+
+
+def reparar(t):
+    if not isinstance(t, str) or not _MOJI.search(t):
+        return t
+    out = bytearray()
+    for ch in t:
+        if ch == '\ufffd':
+            out.append(0x9D if out[-2:] == b'\xe2\x80' else 0x81)
+            continue
+        try:
+            out += ch.encode('cp1252')
+        except UnicodeEncodeError:
+            out += bytes([ord(ch)]) if ord(ch) < 256 else ch.encode('utf-8')
+    try:
+        return out.decode('utf-8')
+    except UnicodeDecodeError:
+        arreglado = out.decode('utf-8', 'replace')
+        # si la reparación deja más «�» que los que traía, mejor el original
+        return arreglado if arreglado.count('\ufffd') <= t.count('\ufffd') else t
+
+
 def pais(item, texto):
-    lugar = fold(dig(item, 'author.location', 'user.location', defecto=''))
+    lugar = fold(reparar(dig(item, 'author.location', 'user.location', defecto='')))
     blob = lugar + ' ' + fold(texto)
     if any(x in lugar for x in OTRO) or (not any(x in blob for x in CO) and any(x in fold(texto) for x in OTRO)):
         return 'otro'
@@ -219,7 +247,7 @@ def normalizar(items, qs, solo_colombia):
             descartes['vacio'] += 1
             continue
         pid = str(dig(it, 'id', 'id_str', 'tweetId', defecto=''))
-        texto = dig(it, 'text', 'fullText', 'full_text', defecto='')
+        texto = reparar(dig(it, 'text', 'fullText', 'full_text', defecto=''))
         if not pid or not texto:
             descartes['vacio'] += 1
             continue
@@ -250,7 +278,7 @@ def normalizar(items, qs, solo_colombia):
         pubs.append({
             'id': pid, 'url': dig(it, 'url', 'twitterUrl', defecto=f'https://x.com/{autor}/status/{pid}'),
             'texto': texto[:600], 'fecha': fecha_iso(dig(it, 'createdAt', 'created_at')),
-            'autor': autor, 'nombre': dig(it, 'author.name', 'user.name', defecto=''),
+            'autor': autor, 'nombre': reparar(dig(it, 'author.name', 'user.name', defecto='')),
             'seguidores': num(dig(it, 'author.followers', 'author.followersCount', 'user.followers_count')),
             'verificada': bool(dig(it, 'author.isBlueVerified', 'author.isVerified', defecto=False)),
             'pais': donde, 'temas': temas, **m,

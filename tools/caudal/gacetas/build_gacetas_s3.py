@@ -91,6 +91,10 @@ def main():
                 num, y = int(m.group(1)), int(m.group(2))
                 if y < 100:
                     y += 1900 if y >= 90 else 2000
+                # (nov-2026) una cita mal leída daba años como 2096 o 1907 en
+                # por_anio: la Gaceta del Congreso existe desde 1991
+                if not 1991 <= y <= int(time.strftime('%Y')):
+                    continue
                 td = TIPO_DOC.get(g.get('tipo'), g.get('tipo') or '')
                 tipos[td] += 1
                 citas[(num, y)].append([tb, int(p['id']), td])

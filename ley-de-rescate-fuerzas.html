@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261111b" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -28,18 +28,18 @@
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261107"></script>
+  <script src="ley-rescate-base.js?v=20261111"></script>
   <script>
 LR.pagina('fuerzas', E => {
   const { $, esc, cara, P, num } = LR, G = { con: ['Congreso', '#3d6eb8'], pub: ['Sector público', '#1c8046'], pri: ['Sector privado', '#b27a12'] };
   const COLS = [['r', 'En contra'], ['i', 'Sin definir'], ['m', 'Con reparos'], ['a', 'Empujan']], TIER = [[5, 'Deciden'], [4, 'Votan o mueven votos'], [3, 'Presión organizada'], [2, 'Opinan con audiencia']];
-  const t3 = new Set(E.votos.bloques.flatMap(b => [...b.plantilla.senado, ...b.plantilla.camara]));
+  const t3 = new Set(E.votos.bloques.flatMap(b => [...b.plantilla.senado, ...b.plantilla.camara])), t4 = new Set(E.votos.bloques.flatMap(b => [...(b.plantilla.senado4 || []), ...(b.plantilla.camara4 || [])]));
   const TL = { a: 'apoyar', m: 'apoyar con cambios', r: 'rechazar' };
   const S = { g: new Set(['con', 'pub', 'pri']), p: new Set(['r', 'i', 'm', 'a']), inc: true, t3: false, y: 'poder', sel: E.voces.find(v => v.q === 'Ministerio de Hacienda') || E.voces[0] };
-  const plano = $('#plano'); plano.innerHTML = '<div id="fondo"></div>' + E.voces.map((v, i) => `<button class="pt" data-i="${i}" style="--c:${G[v.g][1]}" data-tip="${esc(`<b>${esc(v.q)}</b><br>${esc(v.c)}<br>${esc(v.x)}${S ? '' : ''}`)}" aria-label="${esc(v.q)}">${cara(E, v.s, v.q, v.org).replace(' loading="lazy"', '')}<span class="lab">${esc(v.k)}${t3.has(v.s) ? ' <em>T3</em>' : ''}${v.t ? '<small class="td">tiende</small>' : ''}</span></button>`).join('');
+  const plano = $('#plano'); plano.innerHTML = '<div id="fondo"></div>' + E.voces.map((v, i) => `<button class="pt" data-i="${i}" style="--c:${G[v.g][1]}" data-tip="${esc(`<b>${esc(v.q)}</b><br>${esc(v.c)}<br>${esc(v.x)}${S ? '' : ''}`)}" aria-label="${esc(v.q)}">${cara(E, v.s, v.q, v.org).replace(' loading="lazy"', '')}<span class="lab">${esc(v.k)}${t3.has(v.s) ? ' <em>T3</em>' : t4.has(v.s) ? ' <em>T4</em>' : ''}${v.t ? '<small class="td">tiende</small>' : ''}</span></button>`).join('');
   const nodos = [...plano.querySelectorAll('.pt')];
   const col = v => v.p === 'i' && v.t && S.inc ? v.t : v.p;
-  const visible = v => S.g.has(v.g) && S.p.has(col(v)) && (!S.t3 || t3.has(v.s));
+  const visible = v => S.g.has(v.g) && S.p.has(col(v)) && (!S.t3 || t3.has(v.s) || t4.has(v.s));
   function lay() {
     const W = plano.clientWidth, chico = W < 640, eje = chico ? 12 : 92, top = 34, cw = chico ? 36 : 76, ch = chico ? 39 : 62, carril = (W - eje) / 4, cols = Math.max(1, Math.floor((carril - 6) / cw)), vis = E.voces.map((v, i) => ({ v, i })).filter(x => visible(x.v));
     let H, marcas = [], put = {}; const pad = chico ? 18 : 8;
@@ -50,14 +50,14 @@ LR.pagina('fuerzas', E => {
     plano.style.height = H + 'px';
     $('#fondo').innerHTML = COLS.map(([k, t], i) => `<div class="carril c${k}" style="left:${eje + carril * i}px;width:${carril}px"><b>${t}</b></div>`).join('') + marcas.map(([y, a, t]) => `<div class="tier ${a ? '' : 'lin'}" style="top:${y}px;height:${a}px;left:0"><span>${esc(t)}</span></div>`).join('') + `<div class="eje-y">↑ ${S.y === 'poder' ? 'Más poder' : 'Más presencia'}</div><div class="eje-x" style="left:${eje}px"><span>← Frena la ley</span><span>Empuja la ley →</span></div>`;
     E.voces.forEach((v, i) => { const n = nodos[i], p = put[i]; n.classList.toggle('off', !p); n.classList.toggle('sel', v === S.sel); n.classList.toggle('tiende', col(v) !== v.p); if (p) { n.style.left = p[0] + 'px'; n.style.top = p[1] + 'px'; } });
-    const nv = vis.length; $('#nota').innerHTML = `${nv} de ${E.voces.length} jugadores. ` + (S.y === 'poder' ? 'El eje vertical es lectura propia con una regla fija: deciden quienes escribieron el proyecto, presiden o votan en una Comisión Tercera; votan o mueven votos los demás congresistas y los jefes de partido; presión organizada son gremios grandes, sindicatos e instituciones; los demás opinan con audiencia.' : 'El eje vertical es medición: en cuántos titulares y publicaciones sobre la ley aparece el nombre, en escala logarítmica. Estar mucho en la conversación no es apoyar ni pesar: Petro aparece sobre todo porque otros lo nombran. Las menciones con @ no se cuentan.') + ` <b style="color:var(--teal)">T3</b> señala a quien vota en una Comisión Tercera. Una declaración no es un voto. El borde punteado es una inclinación, no una postura: sale de lo que dijo su bancada o su organización, y la razón está en la ficha. Los 44 están en <a href="ley-de-rescate-votos.html">Los votos</a>. Cómo se pararon estos mismos actores en las tributarias desde 2016: <a href="ley-de-rescate-antecedentes.html">Las fuerzas de antes</a>.`;
+    const nv = vis.length; $('#nota').innerHTML = `${nv} de ${E.voces.length} jugadores. ` + (S.y === 'poder' ? 'El eje vertical es lectura propia con una regla fija: deciden quienes escribieron el proyecto, presiden o votan en una de las cuatro comisiones económicas; votan o mueven votos los demás congresistas y los jefes de partido; presión organizada son gremios grandes, sindicatos e instituciones; los demás opinan con audiencia.' : 'El eje vertical es medición: en cuántos titulares y publicaciones sobre la ley aparece el nombre, en escala logarítmica. Estar mucho en la conversación no es apoyar ni pesar: Petro aparece sobre todo porque otros lo nombran. Las menciones con @ no se cuentan.') + ` <b style="color:var(--teal)">T3</b> y <b style="color:var(--teal)">T4</b> señalan a quien vota en una Comisión Tercera o Cuarta. Una declaración no es un voto. El borde punteado es una inclinación, no una postura: sale de lo que dijo su bancada o su organización, y la razón está en la ficha. Los ${t3.size + t4.size} que votan ahí están en <a href="ley-de-rescate-votos.html">Los votos</a>. Cómo se pararon estos mismos actores en las tributarias desde 2016: <a href="ley-de-rescate-antecedentes.html">Las fuerzas de antes</a>.`;
   }
   function det() { const v = S.sel; $('#det').innerHTML = `${cara(E, v.s, v.q, v.org)}<div><b>${esc(v.q)}</b><span class="et-p" style="color:${P[v.p][1]}">${P[v.p][0]}${v.t ? ` · tiende a ${TL[v.t]}` : ''}</span><small>${esc(v.c)} · ${esc(v.b)} · ${v.men} textos</small><p>${esc(v.x)}</p>${v.t ? `<p class="tr"><b>Por qué esa inclinación:</b> ${esc(v.tr || '')}</p>` : ''}${v.u ? `<a href="${esc(v.u)}" target="_blank" rel="noopener" style="font-size:.76rem">${esc(v.f)}</a>` : `<small>${esc(v.f)}</small>`}</div>`; }
   function filtros() {
     $('#f-g').innerHTML = Object.entries(G).map(([k, [t, c]]) => `<button class="pill tog ${S.g.has(k) ? 'on' : ''}" data-g="${k}" aria-pressed="${S.g.has(k)}"><i style="background:${c}"></i>${t}</button>`).join('');
     $('#f-p').innerHTML = [...COLS].reverse().map(([k, t]) => `<button class="pill tog ${S.p.has(k) ? 'on' : ''}" data-h="${k}" aria-pressed="${S.p.has(k)}">${t}</button>`).join('');
     $('#f-i').innerHTML = `<button class="pill tog ${S.inc ? 'on' : ''}" id="inc" aria-pressed="${S.inc}">Hacia dónde tienden</button>`;
-    $('#f-t').innerHTML = `<button class="pill tog ${S.t3 ? 'on' : ''}" id="t3" aria-pressed="${S.t3}">Solo Comisión Tercera</button>`;
+    $('#f-t').innerHTML = `<button class="pill tog ${S.t3 ? 'on' : ''}" id="t3" aria-pressed="${S.t3}">Solo quienes votan el primer debate</button>`;
     $('#f-y').innerHTML = [['poder', 'Poder sobre la decisión'], ['men', 'Presencia en prensa y redes']].map(([k, t]) => `<button class="pill ${S.y === k ? 'on' : ''}" data-y="${k}">${t}</button>`).join('');
     document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const k = b.dataset.g; S.g.has(k) ? S.g.delete(k) : S.g.add(k); filtros(); lay(); });
     document.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { const k = b.dataset.h; S.p.has(k) ? S.p.delete(k) : S.p.add(k); filtros(); lay(); });

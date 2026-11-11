@@ -68,13 +68,20 @@ def proyectos(prev):
     return out, len(vivos)
 
 
-def _mes(pagina):
+def _mes(pagina, fallas):
+    # (nov-2026) una subpágina caída tumbaba el mes entero y con él lo ya
+    # leído. Ahora se salta, se cuenta, y la corrida sale con error para que
+    # se vea; la siguiente la vuelve a pedir (se releen los 3 meses recientes).
     m = C.curl(f'{NORMO}/{pagina}', timeout=60)
     salida = []
     p = _MES.search(pagina)
     fecha = C.fecha_larga(f'{p.group(1)} de {p.group(2)} de {p.group(3)}') if p else ''
     for sub in sorted(set(re.findall(r'href="(1_a_[^"]+_sena\.html)"', m))):
-        h = C.curl(f'{NORMO}/{sub}', timeout=60)
+        try:
+            h = C.curl(f'{NORMO}/{sub}', timeout=60)
+        except Exception as e:
+            fallas.append(f'{sub}: {e}')
+            continue
         for b in re.split(r'<div class="opcion-nueva">', h)[1:]:
             u = re.search(r'href="(docs/([a-z]+)_sena_0*(\d+)_(20\d{2})\.htm)"', b)
             if not u or u.group(2) not in TIPOS:
@@ -94,12 +101,13 @@ def _mes(pagina):
 
 def normas(prev, desde):
     out = {x['url']: x for x in prev}
+    fallas = []
     h = C.curl(f'{NORMO}/novedades_normativas_jurisprudenciales.html', timeout=60)
     meses = [x for x in dict.fromkeys(re.findall(r'href="(novedades_1_a_\d+_[a-z]+_(20\d{2})\.html)"', h)) if int(x[1]) >= desde]
     for pag, _ in (meses if not prev else meses[:3]):
-        for x in _mes(pag):
+        for x in _mes(pag, fallas):
             out[x['url']] = x
-    return list(out.values())
+    return list(out.values()), fallas
 
 
 def fetch(desde):
@@ -116,9 +124,12 @@ def fetch(desde):
         print(f'  sena · proyectos FALLÓ ({e}) — queda el archivo anterior', file=sys.stderr)
     try:
         prev = (C.leer(OUT / 'normas.json', {}) or {}).get('items', [])
-        xs = normas(prev, desde or datetime.date.today().year - 1)
+        xs, fallas = normas(prev, desde or datetime.date.today().year - 1)
         C.escribir(OUT / 'normas.json', {'generado': gen, 'items': xs})
         print(f'  sena · {len(xs)} normas')
+        if fallas:
+            ok = False
+            print(f'  sena · {len(fallas)} subpáginas no bajaron (se guardó lo demás): {fallas[:3]}', file=sys.stderr)
     except Exception as e:
         ok = False
         print(f'  sena · normas FALLÓ ({e}) — queda el archivo anterior', file=sys.stderr)

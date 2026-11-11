@@ -231,8 +231,8 @@ def process_one(entry, use_ocr=False):
     if not dest:
         return ('fail_download', key, None)
 
+    import pypdf   # (nov-2026) fuera del try: sin el paquete, que la etapa falle a la vista
     try:
-        import pypdf
         r = pypdf.PdfReader(str(dest))
         txt = ' '.join((p.extract_text() or '') for p in r.pages)
     except Exception as e:
@@ -351,6 +351,8 @@ def main():
     pending = [e for e in entries if f"{e['num']}-{e['anio']}" not in have]
     _log(f'{len(pending)} por procesar · {args.workers} workers')
 
+    import pypdf  # noqa: F401 · (nov-2026) sin el paquete, cortar acá: dentro de
+    # los hilos el ImportError se contaba como «fail_download» y la etapa salía verde
     fallos_f = open(FALLOS, 'a', encoding='utf-8')
     total = len(entries)
     done = len(entries) - len(pending)

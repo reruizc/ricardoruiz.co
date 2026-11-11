@@ -496,7 +496,7 @@ SECTORES_CLIENTE = [
          {'nombre': 'Landing LATAM', 'comision': 'Segunda',
           'temas': ['inversion extranjera']},
      ],
-     'temas': ['presupuesto general de la nacion', 'reforma tributaria',
+     'temas': ['presupuesto general de la nacion', 'reforma tributaria', 'ley de rescate',
                'consulta previa', 'protesta social', 'reforma electoral',
                'inversion extranjera', 'reforma pensional', 'reforma a la salud']},
 

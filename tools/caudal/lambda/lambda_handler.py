@@ -963,6 +963,43 @@ def _sanciones_stats():
     return _SANC_STATS
 
 
+# Actos internos de la entidad (horarios, nombramientos, manuales de funciones,
+# firma mecánica): no regulan a nadie de afuera y llenaban DIAN (1.055 de 13.026)
+# y Territorial. Se exige el arranque de un acto («Por la cual…») porque los
+# conceptos de la DIAN tratan vacaciones o encargos como tema tributario.
+_ACTO_ARRANQUE_RE = re.compile(r'^\s*(por (la|medio de la|medio del|el) cual|mediante la cual)')
+_ACTO_INTERNO_RE = re.compile(
+    r'horario (de|laboral)|jornada (laboral|de integracion)|dias? habiles|administrativamente habil'
+    r'|firma mecanica|comision de personal|nombramiento|ubicaciones|encargos?\b'
+    r'|planta (global|de personal|de empleos)|manual (especifico )?de (requisitos|funciones)'
+    r'|trabajo en casa|teletrabajo|vacaciones colectivas|competencias (especificas|laborales)'
+    r'|evaluacion del desempeno|escala de asignacion|representantes? de los empleados')
+
+
+def _es_acto_interno(texto):
+    t = _unicodedata.normalize('NFKD', texto or '').encode('ascii', 'ignore').decode().lower()
+    return bool(_ACTO_ARRANQUE_RE.search(t) and _ACTO_INTERNO_RE.search(t))
+
+
+
+# Decretos de personal de Presidencia (nombramientos, renuncias de notarios,
+# encargos, extradiciones, ascensos): ~5.800 de 12.155 en normativa.jsonl, sin
+# marca de «administrativo» porque ese índice es anterior a la marca. Se busca
+# el SUSTANTIVO de personal, no el verbo: «se efectúa un ajuste al Presupuesto»
+# o «se retira la subpartida arancelaria» no son personal.
+_DECRETO_PERSONAL_RE = re.compile(
+    r'^\W*por (?:medio )?(?:del|de la|el|la|e.) (?:cua.? )?se .{0,45}?'
+    r'(nombramiento|nornbramiento|nompramiento|\bnombra\b|renuncia|encargo|\bencarga\b'
+    r'|\bdesigna\b|designacion|designan|traslad|ascien|ascenso|insubsisten|extradicion|vacaciones|vinculacion'
+    r'|comision de servicios|retiro del servicio|retira del servicio|condecora|\bposesion\b|licencia ordinaria)')
+_DECRETO_NO_PERSONAL_RE = re.compile(r'presupuest|arancel|subpartida|regimen|reglament|tarifa|liquidacion de|punto focal|centro nacional')
+
+
+def _es_decreto_personal(r):
+    d = _unicodedata.normalize('NFKD', (r.get('descripcion') or '')[:220]).encode('ascii', 'ignore').decode().lower()
+    return bool(_DECRETO_PERSONAL_RE.search(d)) and not _DECRETO_NO_PERSONAL_RE.search(d)
+
+
 def _sanciones():
     """Lista slim de sanciones (lazy — solo cuando se busca). Cache warm."""
     global _SANC
@@ -973,6 +1010,8 @@ def _sanciones():
             # U+2029 partiría el JSONL en el lugar equivocado (mismo fix que
             # build_s3.py; ver mojibake de Superfinanciera).
             _SANC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+            _SANC = [r for r in _SANC if not (str(r.get('fuente', '')).startswith('dian')
+                                               and _es_acto_interno(r.get('motivo')))]
         except Exception:
             _SANC = []
     return _SANC
@@ -1030,6 +1069,8 @@ def _entidades_jsonl(nombre):
         try:
             obj = _s3.get_object(Bucket=BUCKET, Key=_ENT_KEYS.get(nombre, f'metadata/entidades-{nombre}.jsonl'))
             filas = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+            if nombre == 'territorial':
+                filas = [r for r in filas if not _es_acto_interno(r.get('titulo'))]
         except Exception as e:
             print(f'[entidades] {nombre} FAIL: {type(e).__name__}: {e}')
             # si falla la relectura, se sigue con lo que había (no se vacía)
@@ -1309,8 +1350,44 @@ def _sucop():
                                           r.get('estado'), hoy)
         r['estado_consulta'] = ec
         r['dias_restantes'] = dias
+    recs = _sucop_dedup(recs)
     _SUCOP = (llave, recs)
     return recs
+
+
+
+_SUCOP_AVANCE = {'cierra_pronto': 5, 'abierta': 4, 'cerrada': 3, 'planeacion': 2, 'sin_fechas': 1, 'cancelada': 0}
+
+
+def _sucop_dedup(recs):
+    """(nov-2026) SUCOP repite registros: MinTrabajo subió el mismo decreto
+    cinco veces (PN-2026-24965 a 24968 y 25475), y 266 grupos más vienen
+    duplicados. Se agrupa por entidad + epígrafe completo y se queda el más
+    avanzado (consulta abierta > cerrada > planeación), y a igualdad el más nuevo.
+    Los demás códigos quedan en `codigos_repetidos` para no perderlos."""
+    grupos, orden = {}, []
+    for r in recs:
+        t = _fold_q(r.get('titulo') or '')
+        if len(t) < 25:            # sin epígrafe usable no hay cómo saber si es el mismo
+            orden.append([r])
+            continue
+        k = (_fold_q(r.get('entidad') or ''), re.sub(r'[^a-z0-9]', '', t))
+        if k not in grupos:
+            grupos[k] = []
+            orden.append(grupos[k])
+        grupos[k].append(r)
+    out = []
+    for g in orden:
+        if len(g) == 1:
+            out.append(g[0])
+            continue
+        g = sorted(g, key=lambda r: (_SUCOP_AVANCE.get(r.get('estado_consulta'), 0),
+                                     r.get('fecha_inicio') or '', r.get('creado') or '',
+                                     str(r.get('codigo') or r.get('id') or '')), reverse=True)
+        mejor = dict(g[0])
+        mejor['codigos_repetidos'] = [x.get('codigo') or x.get('id') for x in g[1:]]
+        out.append(mejor)
+    return out
 
 
 def _clave_borrador(t):
@@ -4502,6 +4579,26 @@ def _sucop_para_perfil(s, cap=4):
                                if r.get('sin_texto') else
                                f'Borrador en consulta pública hasta el {fin} — se puede comentar'
                                if fin else 'Borrador en consulta pública — se puede comentar')})
+    # (nov-2026) con cupo libre, lo que la entidad ANUNCIÓ en su agenda
+    # (planeación, este año o el siguiente) y toca los temas: aún no hay borrador
+    # que comentar, pero es el aviso más temprano que existe. Primero los de sus
+    # interlocutores; nunca le quitan lugar a una consulta abierta.
+    if len(out) < cap:
+        anio = _sucop_hoy().year
+        plan = [r for r in _sucop()
+                if r.get('estado_consulta') == 'planeacion'
+                and str(r.get('anio') or '') in (str(anio), str(anio + 1))
+                and any(_tiene(t, r.get('q') or '') for t in temas)]
+        def _de_inter(r):
+            e = _fold_q(r.get('entidad') or '')
+            return any(i in e or e in i for i in inter) if e else False
+        plan.sort(key=lambda r: (not _de_inter(r), -(_sucop_dias_desde_epoca((r.get('creado') or '')[:10]))))
+        for r in plan[:cap - len(out)]:
+            out.append({'tipo': 'sucop', 'titulo': (r.get('titulo') or '')[:200], 'entidad': r.get('entidad') or '',
+                        'url': r.get('url') or '', 'fecha': (r.get('creado') or '')[:10], 'cierra': '', 'dias': None,
+                        'nivel': 'medio' if _de_inter(r) else 'bajo', 'planeacion': True,
+                        'accion': f"En la agenda regulatoria {r.get('anio')} de la entidad: todavía no hay borrador "
+                                  'publicado. Es el momento de pedir reunión antes de que salga'})
     return out, sum(1 for r in hits if r.get('estado_consulta') in ('abierta', 'cierra_pronto'))
 
 
@@ -5735,6 +5832,12 @@ def handler(event, context):
         # del nombre literal — que igual puede aparecer en un decreto puntual.
         emps = empresas.empresas_en(body.get('query') or '')
         vocab = _vocab_empresa(emps, bool(body.get('ampliar_empresa')))
+        # (nov-2026) los actos que el índice marca como administrativos
+        # (nombramientos, traslados, encargos: 1.119) no regulan a nadie; solo
+        # entran si se piden o si se busca un número exacto.
+        con_admin = bool(body.get('administrativos')) or bool(re.fullmatch(r'\d{2,6}', q.strip()))
+        if not con_admin:
+            recs = [r for r in recs if not r.get('administrativo') and not _es_decreto_personal(r)]
         hits = [r for r in recs
                 if (not tipo or (r.get('tipo') or '').upper() == tipo)
                 and (not q

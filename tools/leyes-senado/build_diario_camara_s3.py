@@ -51,8 +51,10 @@ def slug(txt):
 
 
 def extraer_texto(pdf_path, txt_path):
+    # (nov-2026) fuera del try: sin pypdf (pasó con python 3.15) cada gaceta
+    # salía «ERR ImportError» y la etapa terminaba en verde
+    from pypdf import PdfReader
     try:
-        from pypdf import PdfReader
         r = PdfReader(str(pdf_path))
         t = '\n'.join((p.extract_text() or '') for p in r.pages)
     except Exception as e:

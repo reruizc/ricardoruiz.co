@@ -56,7 +56,9 @@ ACTION_RE = re.compile(
 NOISE_RE = re.compile(
     r'(alerta|llamado|recuerda|recomendaci|exonera|evaluar[áa]?\s+multas|gracias\s+a'
     r'|fraudulent|ha\s+adelantado|profiri[oó]\s+\d|rindi[oó]\s+cuentas'
-    r'|en\s+sus\s+primeros|en\s+lo\s+corrido|r[eé]cord|prioriz[oó])', re.I)
+    r'|en\s+sus\s+primeros|en\s+lo\s+corrido|r[eé]cord|prioriz[oó]'
+    # (nov-2026) avisos de servicio que traen «multa» sin ser una sanción
+    r'|\bPSE\b|paga\s+tus|pagar\s+tus|cazafoto|fotomulta|bot[oó]n)', re.I)
 
 
 def es_sancion(titulo):
@@ -256,6 +258,15 @@ SIC_MAX_PAG = 110          # primera corrida: el archivo completo (~103 páginas
 SIC_MAX_PAG_INCR = 8       # después: lo nuevo siempre está en las primeras páginas
 
 
+
+def _sic_slug(url):
+    """Slug del comunicado sin la ruta ni el «-0/-1» que agrega la sede."""
+    if not url:
+        return ''
+    sl = url.rstrip('/').rsplit('/', 1)[-1]
+    return 'slug:' + re.sub(r'-\d$', '', sl)
+
+
 def fetch_sic():
     """Comunicados de la sede electrónica (nov-2026).
 
@@ -269,7 +280,21 @@ def fetch_sic():
         prev = json.loads((RAW / 'sic.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         prev = []
-    conocidos = {r.get('url') for r in prev}
+    # (nov-2026) la sede publica el mismo comunicado en /noticias/ y en
+    # /comunicado/, a veces con un «-0» al final: se deduplica por el slug
+    # y se sacan los avisos de servicio que se colaron antes del filtro.
+    vistos_slug, limpio = set(), []
+    for r in prev:
+        sl = _sic_slug(r.get('url'))
+        if (sl and sl in vistos_slug) or (r.get('url') and NOISE_RE.search(r.get('titulo') or r.get('motivo') or '')):
+            continue
+        if sl:
+            vistos_slug.add(sl)
+        limpio.append(r)
+    if len(limpio) != len(prev):
+        print(f'  sic: {len(prev) - len(limpio)} repetidos o avisos de servicio fuera')
+    prev = limpio
+    conocidos = {r.get('url') for r in prev} | vistos_slug
     hay_sede = any(SIC_SEDE in (r.get('url') or '') for r in prev)
     tope = SIC_MAX_PAG_INCR if hay_sede else SIC_MAX_PAG
     nuevos, vistos = [], set()
@@ -284,9 +309,11 @@ def fetch_sic():
         for href, txt in links:
             url = href if href.startswith('http') else SIC_SEDE + href
             titulo = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', txt))).strip()
-            if not titulo or url in vistos or url in conocidos or not es_sancion(titulo):
+            sl = _sic_slug(url)
+            if not titulo or url in vistos or url in conocidos or sl in conocidos or sl in vistos or not es_sancion(titulo):
                 continue
             vistos.add(url)
+            vistos.add(sl)
             rec = parse_titulo(titulo)
             rec.update(url=url, fecha=None, id=f'sic-{url}')
             nuevos.append(rec)

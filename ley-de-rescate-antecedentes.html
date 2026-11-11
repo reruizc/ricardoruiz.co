@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261111b" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -33,7 +33,7 @@
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261107"></script>
+  <script src="ley-rescate-base.js?v=20261111"></script>
   <script>
 LR.pagina('antecedentes', E => {
   const { $, esc, corta } = LR, F = E.fuerzas_hist || {}, RF = F.reformas || [], AC = F.actores || [], CE = F.celdas || {};
@@ -41,13 +41,13 @@ LR.pagina('antecedentes', E => {
   const C = { a: ['Apoyó', 'var(--apoya)'], m: ['Con reparos', '#d9a441'], r: ['Se opuso', 'var(--rechaza)'] };
   const G = { gre: 'Gremios', cen: 'Centros de pensamiento', sin: 'Sindicatos', par: 'Partidos' }, S = { g: new Set(Object.keys(G)) };
   const SRC = { gaceta: 'Gaceta del Congreso', prensa: 'Titular de prensa', curada: 'Seguimiento 2026' };
-  const anio = r => r.id === 'r2026' ? '2026' : r.nombre.match(/\d{4}/)[0], corto = r => r.nombre.replace(/ \d{4}$/, '');
+  const anio = r => r.id === 'r2026' ? '2026' : r.nombre.match(/\d{4}/)[0], corto = r => r.id === 'r2022' ? 'Reforma para la igualdad' : r.nombre.replace(/ \d{4}$/, ''), RES = { caida: 'tumbada por la Corte' };
   const conP = a => RF.filter(r => CE[a.id]?.[r.id]?.p);
   const nPost = Object.values(CE).reduce((s, x) => s + Object.values(x).filter(c => c.p).length, 0), nTit = Object.values(F.fuentes?.prensa || {}).reduce((s, n) => s + n, 0);
   $('#akpis').innerHTML = [['Reformas', RF.length - 1, 'tributarias desde 2016, más la Ley de Rescate'], ['Actores', AC.length, 'gremios, centros de pensamiento, sindicatos y partidos'], ['Posturas', nPost, 'con su evidencia a la vista'], ['Fuentes', nTit, 'titulares leídos, dos ponencias y dos votaciones en plenaria']].map(([l, v, d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
   function mat() {
     const L = AC.filter(a => S.g.has(a.g));
-    $('#mat').innerHTML = `<thead><tr><th></th>${RF.map(r => `<th title="${esc(r.nombre)}"><b>${anio(r)}</b><small>${esc(corto(r))}</small><small>${esc(r.gobierno || 'De la Espriella')}${r.res ? ' · ' + esc(r.res) : ''}</small></th>`).join('')}</tr></thead><tbody>` +
+    $('#mat').innerHTML = `<thead><tr><th></th>${RF.map(r => `<th title="${esc(r.nombre)}"><b>${anio(r)}</b><small>${esc(corto(r))}</small><small>${esc(r.gobierno || 'De la Espriella')}${r.res ? ' · ' + esc(RES[r.res] || r.res) : ''}</small></th>`).join('')}</tr></thead><tbody>` +
       Object.keys(G).filter(g => S.g.has(g)).map(g => `<tr class="gr"><td colspan="${RF.length + 1}">${G[g]}</td></tr>` + L.filter(a => a.g === g).map(a => `<tr><th>${esc(a.nombre)}</th>${RF.map(r => { const c = CE[a.id]?.[r.id]; if (!c) return '<td></td>'; const k = c.p ? 'p' + c.p : 'as'; return `<td><button class="ant-c ${k} ${c.inferida ? 'inf' : ''}" data-a="${a.id}" data-r="${r.id}" aria-label="${esc(a.nombre)}, ${esc(r.nombre)}: ${c.p ? C[c.p][0] : 'estuvo en la audiencia'}"></button></td>`; }).join('')}</tr>`).join('')).join('') + '</tbody>';
     document.querySelectorAll('.ant-c').forEach(b => b.onclick = () => det(b.dataset.a, b.dataset.r));
   }
