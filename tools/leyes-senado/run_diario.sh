@@ -32,6 +32,7 @@
 #   gacetas_enumera/texto/build/upload  enumerar_gacetas.py …  Gaceta del Congreso (ventana de 45 días)
 #   control_fetch/build/upload  harvest_jurisprudencia.py  Corte Constitucional (una vez al día)
 #   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
+#   supers_fetch_sic_circulares / supers_fetch_supersalud_registro   (nov-2026) dos fuentes que no se cosechaban
 #   supers_consolida          harvest_supers.py normalize las 12 fuentes del pilar en un dataset
 #   supers_build_s3           build_s3.py                 el slim que lee la Lambda
 #   supers_verifica           verificar_consolidado.py    piso por fuente ANTES de publicar
@@ -631,6 +632,20 @@ etapa() {
   etapa --nombre supers_fetch_comunicados --timeout 1200 \
         --desc "sanciones anunciadas en comunicados: SIC (sede electrónica), Supertransporte, Supersalud" \
         -- python3 tools/caudal/supers/harvest_comunicados.py fetch
+  # (nov-2026) Dos fuentes del pilar que existían pero nadie cosechaba: las
+  # circulares y resoluciones generales de la SIC (última el 8-ago; faltaba la
+  # CE 004 del 20-oct) y el registro de actos de Supersalud (31-jul), que lee
+  # cada PDF con DeepSeek. Las dos son incrementales; el tope de Supersalud
+  # acota el gasto del modelo por corrida.
+  etapa --nombre supers_fetch_sic_circulares --timeout 900 \
+        --desc "SIC · circulares y resoluciones de carácter general (sede electrónica)" \
+        -- python3 tools/caudal/supers/harvest_sic_circulares.py fetch
+  etapa --nombre supers_fetch_supersalud_registro --timeout 1800 \
+        --desc "Supersalud · registro de actos (PDF → DeepSeek, incremental, tope 40)" \
+        -- bash -c 'export DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-$(aws lambda get-function-configuration --function-name caudal-analiza --query Environment.Variables.DEEPSEEK_API_KEY --output text)}"; \
+           python3 tools/caudal/supers/harvest_supersalud_registro.py enumerate && \
+           python3 tools/caudal/supers/harvest_supersalud_registro.py download --limit 80 && \
+           python3 tools/caudal/supers/harvest_supersalud_registro.py extract --limit 40'
 
   # Supersociedades tiene dos colas y la que importa refrescar a diario es la de
   # PROYECTOS: sus ventanas de comentarios duran entre 4 y 15 días, así que un
@@ -726,6 +741,16 @@ etapa() {
   # sembró todo 2026 el 26-oct y la EC2 solo tenía 47 ediciones. Se baja lo
   # que falte y se sube lo nuevo, siempre ADITIVO (sin --delete).
   DOC="$REPO/Bases de datos/leyes-senado/ejecutivo/diario-oficial"
+  # (nov-2026) El Diario Oficial llevaba 10 días quieto: la EC2 baja las
+  # ediciones en `ejecutivo_diario_oficial`, pero su CAUDAL_ETAPAS no incluye
+  # `diario_oficial_*`, así que nunca las subía; y el Mac, que arma el índice,
+  # excluye `ejecutivo_*` y no las bajaba. El Mac ya lee la Imprenta para las
+  # gacetas (mismo host), así que baja aquí mismo las ediciones de los últimos
+  # 10 días; lo ya leído sale del caché. El nombre `diario_oficial_*` la deja
+  # fuera de la EC2 sin tocar su crontab.
+  etapa --nombre diario_oficial_fetch --timeout 1800 \
+        --desc "ediciones del Diario Oficial · últimos 10 días (Imprenta)" \
+        -- python3 tools/caudal/ejecutivo/harvest_diario_oficial.py fetch --dias 10
   etapa --nombre diario_oficial_cache_sync --timeout 600 \
         --desc "caché de texto del Diario Oficial ↔ S3 (aditivo)" \
         -- bash -c "mkdir -p \"$DOC\" && aws s3 sync s3://caudal-legislativo/raw/diario-oficial-txt/ \"$DOC/\" --only-show-errors && \

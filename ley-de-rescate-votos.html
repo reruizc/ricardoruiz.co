@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Los votos · Ley de Rescate · Caudal × Cauce</title>
-  <meta name="description" content="Arme su escenario: quién vota primero la Ley de Rescate en las Comisiones Terceras, congresista por congresista." />
+  <meta name="description" content="Arme su escenario: quién vota primero la Ley de Rescate en las comisiones económicas, congresista por congresista." />
   <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-votos.html" />
   <meta property="og:title" content="Los votos · Ley de Rescate · Caudal × Cauce" />
-  <meta property="og:description" content="Arme su escenario: quién vota primero la Ley de Rescate en las Comisiones Terceras, congresista por congresista." />
+  <meta property="og:description" content="Arme su escenario: quién vota primero la Ley de Rescate en las comisiones económicas, congresista por congresista." />
   <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -21,6 +21,8 @@
     .as .ptd{position:absolute;right:-14%;bottom:-10%;font:700 clamp(.44rem,1.05vw,.62rem)/1 'HN',Helvetica,Arial,sans-serif;letter-spacing:.02em;padding:.18em .32em;border-radius:3px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;z-index:2;white-space:nowrap}
     .vt-aviso{margin-top:1.2rem;padding:.8rem 1rem;border-radius:10px;background:#fff8e6;border:1px solid #e6c56a;font-size:.9rem;line-height:1.5;color:var(--ink)}
     .vt-aviso b{font-weight:700}
+    .vt-modos{margin-top:1.1rem;align-items:center}.vt-modos span{font-size:.8rem;color:var(--ink2);margin-right:.2rem}
+    @media(min-width:881px){.hemis.h4{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);row-gap:2.2rem}}
     .ley-pt{display:flex;flex-wrap:wrap;gap:.35rem .9rem;margin:.2rem 0 1.2rem;font-size:.74rem;color:var(--ink2)}
     .ley-pt span{display:inline-flex;align-items:center;gap:.35rem}
     .ley-pt .ptd{position:static;font:700 .62rem/1 'HN',Helvetica,Arial,sans-serif;padding:.2em .36em;border-radius:3px}
@@ -31,56 +33,77 @@
   <main class="wrap">
     <div class="k">Ley de Rescate · PL 477 de 2026 Cámara · 328 de 2026 Senado</div>
     <h1>Haga la cuenta usted mismo</h1>
-    <p class="lead">La ley se vota primero en las Comisiones Terceras. <b>Toque a cada congresista</b> para marcar si apoya, rechaza o sigue sin definir, y vea si el proyecto pasa. El punto de partida solo marca a quien habló como bancada: nadie ha votado todavía. El <b>borde punteado</b> dice hacia dónde tiende cada bancada indecisa, con la razón en su tarjeta.</p>
+    <p class="lead">El primer debate se vota en las comisiones económicas de Senado y Cámara, juntas pero cada una por separado. <b>Toque a cada congresista</b> para marcar si apoya, rechaza o sigue sin definir, y vea si el proyecto pasa. El punto de partida solo marca a quien habló como bancada: nadie ha votado todavía. El <b>borde punteado</b> dice hacia dónde tiende cada bancada indecisa, con la razón en su tarjeta.</p>
     <div id="app" hidden>
       <p class="vt-aviso" id="aviso" hidden></p>
+      <div class="pills vt-modos" id="modos" hidden><span>Quién vota el primer debate:</span><button class="pill" data-modo="cuatro">Las cuatro comisiones económicas</button><button class="pill" data-modo="terceras">Solo las Terceras</button></div>
       <div class="esc" id="esc"></div>
       <div class="panel"><div class="esc-top"><div class="pills" id="presets"></div><button class="pill" id="copiar">Copiar enlace del escenario</button></div>
         <div class="hemis" id="com"></div>
         <div class="ley"><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--informa)"></i>Sin definir</span><span><i class="pt-tsi"></i>Tiende al sí</span><span><i class="pt-tno"></i>Tiende al no</span><span style="color:var(--ink3)">Un toque: apoya · dos: rechaza · tres: sin definir</span></div></div>
       <div class="ley-pt" id="ley-pt"></div>
       <section class="bloque"><h2>Por bancada</h2><p class="sub">Un toque cambia a toda la bancada de una vez.</p><div class="blq" id="blq"></div></section>
-      <p class="aparte" id="aparte">La mayoría de 8 y 16 supone asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero cada comisión vota por separado. Plantillas y fotos oficiales del Senado y la Cámara.</p>
+      <p class="aparte" id="aparte"></p>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
   <script src="ley-rescate-base.js?v=20261111"></script>
   <script>
 const ORDEN = ['pacto', 'verde', 'paz', 'lib', 'asi', 'u', 'con', 'cr', 'cd', 'sn'];
-const FILAS = { senado: { f: [[43, 84, 9], [26, 50, 6]], w: 10.6 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
+// Filas de cada hemiciclo: [radio x, radio y, sillas]. Senado 15 · Cámara 31 (Tercera) y 29 (Cuarta).
+const FILAS = { senado: { f: [[43, 84, 9], [26, 50, 6]], w: 10.6 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 },
+  senado4: { f: [[43, 84, 9], [26, 50, 6]], w: 10.6 }, camara4: { f: [[46, 88, 13], [34.5, 66, 10], [23, 44, 6]], w: 8.5 } };
+const CORTO = { senado: 'Tercera del Senado', camara: 'Tercera de la Cámara', senado4: 'Cuarta del Senado', camara4: 'Cuarta de la Cámara' };
+const MODOS = { cuatro: ['senado', 'camara', 'senado4', 'camara4'], terceras: ['senado', 'camara'] };
 const SIG = { pacto: ['PH', '#6b2d8b'], verde: ['AV', '#2e8b3e'], paz: ['Paz', '#7a6150'], lib: ['Lib', '#e0342b'], asi: ['ASI', '#e08a00'], u: ['U', '#f2a100', '#1b1b1b'], con: ['Con', '#2f6fd0'], cr: ['CR', '#8e1f1f'], cd: ['CD', '#0d2f6b'], sn: ['SN', '#c9a227', '#1b1b1b'] };
 const chip = id => { const [t, bg, fg] = SIG[id] || ['', '#666']; return `<span class="ptd" style="background:${bg};color:${fg || '#fff'}" aria-hidden="true">${t}</span>`; };
 const TD = { si: 'Tiende al sí', aj: 'Tiende al sí con ajustes', no: 'Tiende al no' };
 LR.pagina('votos', E => {
   const { $, esc, cara } = LR, { bloques, camaras } = E.votos, bl = id => bloques.find(b => b.id === id), V = {};
-  const miembros = c => ORDEN.flatMap(id => bl(id).plantilla[c].map(s => ({ s, b: bl(id) })));
-  const todos = [...miembros('senado'), ...miembros('camara')], est = m => V[m.s] ?? m.b.post;
+  // Un congresista está en una sola comisión permanente, así que la clave de su voto puede ser su slug.
+  const hay = c => camaras[c] && bloques.some(b => (b.plantilla[c] || []).length);
+  let modo = /m=3/.test(location.hash) || !hay('senado4') ? 'terceras' : 'cuatro';
+  const coms = () => MODOS[modo].filter(hay);
+  const miembros = c => ORDEN.flatMap(id => (bl(id).plantilla[c] || []).map(s => ({ s, b: bl(id), c })));
+  const todos = () => coms().flatMap(miembros), est = m => V[m.s] ?? m.b.post;
   const dicho = Object.fromEntries(E.voces.filter(v => v.s).map(v => [v.s, v.x]));
   function asientos(c) { const pos = []; FILAS[c].f.forEach(([rx, ry, k], fila) => { for (let i = 0; i < k; i++) { const t = Math.PI * (1 - i / (k - 1)); pos.push({ t, fila, x: 50 + rx * Math.cos(t), y: 90 - ry * Math.sin(t) }); } }); return pos.sort((a, b) => b.t - a.t || a.fila - b.fila); }
-  function resumen(c) { const ms = miembros(c), si = ms.filter(m => est(m) === 'si').length, no = ms.filter(m => est(m) === 'no').length; return { si, no, sin: ms.length - si - no, C: camaras[c] }; }
+  function resumen(c) { const ms = miembros(c), si = ms.filter(m => est(m) === 'si').length, no = ms.filter(m => est(m) === 'no').length; return { c, si, no, sin: ms.length - si - no, C: camaras[c] }; }
   function arma() {
-    $('#com').innerHTML = ['senado', 'camara'].map(c => { const C = camaras[c], ms = miembros(c), pos = asientos(c), w = FILAS[c].w;
-      const sillas = ms.map((m, i) => { const n = E.personas[m.s]?.n || m.s, tip = `<b>${esc(n)}</b><br>${esc(m.b.nombre)}${dicho[m.s] ? '<br>' + esc(dicho[m.s]) : ''}`; return `<button class="as" style="left:${pos[i].x}%;top:${pos[i].y}%;width:${w}%" data-s="${m.s}" data-tip="${esc(tip)}">${cara(E, m.s, n).replace(' loading="lazy"', '')}${chip(m.b.id)}</button>`; }).join('');
-      return `<div class="hemi" data-c="${c}"><h3>${C.nombre}</h3><div class="hemi-box ${c}">${sillas}<div class="hemi-c"><b></b><span>de ${C.mayoria} necesarios</span></div></div><div class="barra" aria-hidden="true"><i class="si"></i><i class="no"></i><u style="left:${100 * C.mayoria / C.total}%"></u></div><div class="c"></div></div>`; }).join('');
-    document.querySelectorAll('.as').forEach(x => x.onclick = () => { const m = todos.find(y => y.s === x.dataset.s), o = ['sin', 'si', 'no']; V[m.s] = o[(o.indexOf(est(m)) + 1) % 3]; apagar(); pinta(); });
+    const cs = coms();
+    $('#com').className = 'hemis' + (cs.length > 2 ? ' h4' : '');
+    $('#com').innerHTML = cs.map(c => { const C = camaras[c], ms = miembros(c), pos = asientos(c), w = FILAS[c].w;
+      const sillas = ms.map((m, i) => { const n = E.personas[m.s]?.n || m.s, tip = `<b>${esc(n)}</b><br>${esc(m.b.nombre)} · ${CORTO[c]}${dicho[m.s] ? '<br>' + esc(dicho[m.s]) : ''}`; return `<button class="as" style="left:${pos[i].x}%;top:${pos[i].y}%;width:${w}%" data-s="${m.s}" data-tip="${esc(tip)}">${cara(E, m.s, n).replace(' loading="lazy"', '')}${chip(m.b.id)}</button>`; }).join('');
+      return `<div class="hemi" data-c="${c}"><h3>${C.nombre}</h3><div class="hemi-box ${c.replace('4', '')}">${sillas}<div class="hemi-c"><b></b><span>de ${C.mayoria} necesarios</span></div></div><div class="barra" aria-hidden="true"><i class="si"></i><i class="no"></i><u style="left:${100 * C.mayoria / C.total}%"></u></div><div class="c"></div></div>`; }).join('');
+    document.querySelectorAll('.as').forEach(x => x.onclick = () => { const m = todos().find(y => y.s === x.dataset.s), o = ['sin', 'si', 'no']; V[m.s] = o[(o.indexOf(est(m)) + 1) % 3]; apagar(); pinta(); });
+    document.querySelectorAll('[data-modo]').forEach(b => b.classList.toggle('on', b.dataset.modo === modo));
+    const may = cs.map(c => camaras[c].mayoria);
+    $('#aparte').innerHTML = `Las mayorías (${cs.map(c => `${camaras[c].mayoria} en la ${CORTO[c]}`).join(', ')}) suponen asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero <b>cada comisión vota por separado</b>: para pasar, la ley necesita la mayoría en cada una. Plantillas y fotos oficiales del Senado y la Cámara.`;
   }
   function pinta() {
-    for (const m of todos) { const n = document.querySelector(`.as[data-s="${m.s}"]`), e = est(m); n.className = 'as ' + e + (e === 'sin' && m.b.tiende ? (m.b.tiende === 'no' ? ' tno' : ' tsi') : ''); n.setAttribute('aria-label', `${E.personas[m.s]?.n || m.s}, ${{ si: 'apoya', no: 'rechaza', sin: 'sin definir' }[e]}${e === 'sin' && m.b.tiende ? ', ' + TD[m.b.tiende].toLowerCase() : ''}`); }
-    for (const c of ['senado', 'camara']) { const R = resumen(c), h = document.querySelector(`.hemi[data-c="${c}"]`), k = R.si >= R.C.mayoria ? 'pasa' : R.no > R.C.total - R.C.mayoria ? 'cae' : '';
+    const T = todos(), cs = coms();
+    for (const m of T) { const n = document.querySelector(`.as[data-s="${m.s}"]`), e = est(m); n.className = 'as ' + e + (e === 'sin' && m.b.tiende ? (m.b.tiende === 'no' ? ' tno' : ' tsi') : ''); n.setAttribute('aria-label', `${E.personas[m.s]?.n || m.s}, ${{ si: 'apoya', no: 'rechaza', sin: 'sin definir' }[e]}${e === 'sin' && m.b.tiende ? ', ' + TD[m.b.tiende].toLowerCase() : ''}`); }
+    const RS = cs.map(resumen);
+    for (const R of RS) { const h = document.querySelector(`.hemi[data-c="${R.c}"]`), k = R.si >= R.C.mayoria ? 'pasa' : R.no > R.C.total - R.C.mayoria ? 'cae' : '';
       h.querySelector('.hemi-c').className = 'hemi-c ' + k; h.querySelector('.hemi-c b').textContent = R.si; h.querySelector('.barra .si').style.width = 100 * R.si / R.C.total + '%'; h.querySelector('.barra .no').style.width = 100 * R.no / R.C.total + '%'; h.querySelector('.c').textContent = `${R.si} apoyan · ${R.no} rechazan · ${R.sin} sin definir`; }
-    const S = resumen('senado'), C = resumen('camara'), ok = x => x.si >= x.C.mayoria, ko = x => x.no > x.C.total - x.C.mayoria;
-    const txt = ok(S) && ok(C) ? ['pasa', 'Con este escenario, la ley pasa en las dos comisiones.'] : ko(S) || ko(C) ? ['cae', `Con este escenario, la ley se hunde en ${ko(S) && ko(C) ? 'las dos comisiones' : ko(S) ? 'el Senado' : 'la Cámara'}: ya no alcanzan los votos.`] : ['', `Todavía no se define: faltan ${Math.max(S.C.mayoria - S.si, 0)} en Senado y ${Math.max(C.C.mayoria - C.si, 0)} en Cámara.`];
+    const ok = x => x.si >= x.C.mayoria, ko = x => x.no > x.C.total - x.C.mayoria, caen = RS.filter(ko), faltan = RS.filter(x => !ok(x));
+    const lista = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0];
+    const txt = !faltan.length ? ['pasa', `Con este escenario, la ley pasa en ${RS.length === 2 ? 'las dos' : 'las ' + RS.length} comisiones.`]
+      : caen.length ? ['cae', `Con este escenario, la ley se hunde en la ${lista(caen.map(x => CORTO[x.c]))}: ya no alcanzan los votos.`]
+      : ['', `Todavía no se define: faltan ${lista(faltan.map(x => `${x.C.mayoria - x.si} en la ${CORTO[x.c]}`))}.`];
     $('#esc').className = 'esc ' + txt[0]; $('#esc').textContent = txt[1];
-    $('#blq').innerHTML = bloques.map(b => { const ms = todos.filter(m => m.b === b), est3 = new Set(ms.map(est)), e = est3.size === 1 ? [...est3][0] : 'mix'; return `<button class="b ${e}" data-b="${b.id}"><b>${esc(b.nombre)} <small style="color:var(--ink3);font-weight:400">${b.senado} Sen · ${b.camara} Cám</small></b><em>${{ si: 'APOYA', no: 'RECHAZA', sin: 'SIN DEFINIR', mix: 'DIVIDIDA' }[e]}${b.post === 'sin' ? `<small class="td ${b.tiende || ''}">${b.tiende ? TD[b.tiende] : 'Sin señal'}</small>` : ''}</em><span>${esc(b.nota)}${b.por ? `<br><b>Inclinación:</b> ${esc(b.por)}` : ''}</span></button>`; }).join('');
-    document.querySelectorAll('.b').forEach(x => x.onclick = () => { const ms = todos.filter(m => m.b.id === x.dataset.b), set = new Set(ms.map(est)), a = set.size === 1 ? [...set][0] : 'sin', o = ['sin', 'si', 'no'], n = o[(o.indexOf(a) + 1) % 3]; ms.forEach(m => V[m.s] = n); apagar(); pinta(); });
+    const cuenta = b => cs.map(c => (b.plantilla[c] || []).length), et = cs.map(c => ({ senado: 'T3 Sen', camara: 'T3 Cám', senado4: 'T4 Sen', camara4: 'T4 Cám' })[c]);
+    $('#blq').innerHTML = bloques.map(b => { const ms = T.filter(m => m.b === b); if (!ms.length) return ''; const est3 = new Set(ms.map(est)), e = est3.size === 1 ? [...est3][0] : 'mix'; return `<button class="b ${e}" data-b="${b.id}"><b>${esc(b.nombre)} <small style="color:var(--ink3);font-weight:400">${cuenta(b).map((n, i) => n ? `${n} ${et[i]}` : '').filter(Boolean).join(' · ')}</small></b><em>${{ si: 'APOYA', no: 'RECHAZA', sin: 'SIN DEFINIR', mix: 'DIVIDIDA' }[e]}${b.post === 'sin' ? `<small class="td ${b.tiende || ''}">${b.tiende ? TD[b.tiende] : 'Sin señal'}</small>` : ''}</em><span>${esc(b.nota)}${b.por ? `<br><b>Inclinación:</b> ${esc(b.por)}` : ''}</span></button>`; }).join('');
+    document.querySelectorAll('.b').forEach(x => x.onclick = () => { const ms = T.filter(m => m.b.id === x.dataset.b), set = new Set(ms.map(est)), a = set.size === 1 ? [...set][0] : 'sin', o = ['sin', 'si', 'no'], n = o[(o.indexOf(a) + 1) % 3]; ms.forEach(m => V[m.s] = n); apagar(); pinta(); });
   }
   const apagar = () => document.querySelectorAll('[data-p]').forEach(y => y.classList.remove('on'));
-  const PRE = [['Punto de partida', () => {}], ['Hacia dónde tienden', () => todos.filter(m => m.b.post === 'sin' && m.b.tiende).forEach(m => V[m.s] = m.b.tiende === 'no' ? 'no' : 'si')], ['Aliados del Gobierno con el sí', () => ['cd', 'con', 'cr', 'u'].forEach(id => todos.filter(m => m.b.id === id).forEach(m => V[m.s] = 'si'))], ['El CD vota no', () => todos.filter(m => m.b.id === 'cd').forEach(m => V[m.s] = 'no')], ['Indecisos a favor', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'si')], ['Indecisos en contra', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'no')]];
+  const PRE = [['Punto de partida', () => {}], ['Hacia dónde tienden', () => todos().filter(m => m.b.post === 'sin' && m.b.tiende).forEach(m => V[m.s] = m.b.tiende === 'no' ? 'no' : 'si')], ['Aliados del Gobierno con el sí', () => ['cd', 'con', 'cr', 'u'].forEach(id => todos().filter(m => m.b.id === id).forEach(m => V[m.s] = 'si'))], ['El CD vota no', () => todos().filter(m => m.b.id === 'cd').forEach(m => V[m.s] = 'no')], ['Indecisos a favor', () => todos().filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'si')], ['Indecisos en contra', () => todos().filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'no')]];
   $('#presets').innerHTML = PRE.map(([t], i) => `<button class="pill ${i ? '' : 'on'}" data-p="${i}">${t}</button>`).join('');
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { Object.keys(V).forEach(k => delete V[k]); PRE[b.dataset.p][1](); document.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); pinta(); });
-  const m0 = location.hash.match(/e=([sn.]+)/); if (m0 && m0[1].length === todos.length) { todos.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); }
-  $('#copiar').onclick = async ev => { const c = todos.map(m => ({ si: 's', no: 'n', sin: '.' }[est(m)])).join(''), u = location.origin + location.pathname + '#e=' + c; history.replaceState(null, '', '#e=' + c); try { await navigator.clipboard.writeText(u); ev.target.textContent = 'Enlace copiado'; } catch { ev.target.textContent = 'Copie la dirección de esta página'; } setTimeout(() => ev.target.textContent = 'Copiar enlace del escenario', 2200); };
-  $('#aparte').textContent = $('#aparte').textContent.replace(/La mayoría de \d+ y \d+/, `La mayoría de ${camaras.senado.mayoria} y ${camaras.camara.mayoria}`);
+  if (hay('senado4')) { $('#modos').hidden = false; document.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { modo = b.dataset.modo; arma(); pinta(); }); }
+  // Enlace de escenario: m=3 (solo Terceras) o m=4 (las cuatro), y un carácter por silla en el orden de la página.
+  const m0 = location.hash.match(/e=([sn.]+)/); if (m0) { const T = todos(); if (m0[1].length === T.length) { T.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); } }
+  $('#copiar').onclick = async ev => { const c = todos().map(m => ({ si: 's', no: 'n', sin: '.' }[est(m)])).join(''), h = `#m=${modo === 'terceras' ? 3 : 4}&e=${c}`, u = location.origin + location.pathname + h; history.replaceState(null, '', h); try { await navigator.clipboard.writeText(u); ev.target.textContent = 'Enlace copiado'; } catch { ev.target.textContent = 'Copie la dirección de esta página'; } setTimeout(() => ev.target.textContent = 'Copiar enlace del escenario', 2200); };
   if (E.votos.aviso) { $('#aviso').hidden = false; $('#aviso').innerHTML = '<b>Ojo:</b> ' + esc(E.votos.aviso); }
   $('#ley-pt').innerHTML = ORDEN.map(id => `<span>${chip(id)}${esc(bl(id).nombre)}</span>`).join('');
   arma(); pinta();

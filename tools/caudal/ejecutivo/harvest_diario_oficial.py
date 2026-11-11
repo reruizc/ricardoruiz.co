@@ -365,7 +365,7 @@ _ROTULO = re.compile(
     r'^\s*(Resoluciones(?:\s+(?:Ejecutivas|ejecutivas|Conjuntas|conjuntas|Org[áa]nicas|Reglamentarias))?'
     r'|RESOLUCIONES|Circulares(?:\s+(?:Externas|externas|Conjuntas|Arancelarias))?|CIRCULARES'
     r'|Acuerdos|ACUERDOS|Directivas(?:\s+Presidenciales)?|Decretos|DECRETOS|Leyes|LEYES'
-    r'|Autos|Edictos|Avisos|Actos\s+Legislativos)\s*$')
+    r'|Autos|Edictos|Avisos|Actos\s+Legislativos)\s*$', re.I)   # (nov-2026) «Resoluciones EJECUTIVAS» también existe
 # Grupos de entidades: van encima de la entidad y no son ella.
 _GRUPOS = {
     'establecimientos publicos', 'superintendencias', 'unidades administrativas especiales',

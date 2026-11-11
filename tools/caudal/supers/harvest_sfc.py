@@ -93,6 +93,12 @@ def transform(row):
     row = dict(row)
     row['fechaFirmeza'] = _epoch_to_iso(row.get('fechaFirmeza'))
     row['fechaActoAdmin'] = _epoch_to_iso(row.get('fechaActoAdmin'))
+    # (nov-2026) 371 de 786 llegaban sin fechaFirmeza aunque traían la fecha del
+    # acto: sin fecha no se ordenaban ni entraban a «lo más reciente». La del
+    # acto va de respaldo y se marca, porque la firmeza puede ser posterior.
+    if not row['fechaFirmeza'] and row['fechaActoAdmin']:
+        row['fechaFirmeza'] = row['fechaActoAdmin']
+        row['fecha_es_del_acto'] = True
     if row.get('numeroActoAdmin') is not None:
         row['numeroActoAdmin'] = str(row['numeroActoAdmin'])
     return row

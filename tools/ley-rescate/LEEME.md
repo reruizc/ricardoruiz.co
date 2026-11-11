@@ -107,6 +107,8 @@ Orden: `ollama serve` · `prensa.py` · `gacetas.py` (~25 min) · `clasificar.py
 - `.ant-scroll` necesita `position:relative`: sin eso los hijos posicionados de la matriz escapan del scroll y ensanchan la página.
 - Los contadores de días usan la fecha real de Bogotá (`E.hoy` se corrige en `pagina()`; `E.dato` guarda la del dato):
   el cron de las 06:15 lo está corriendo GitHub entre el mediodía y las 4:30 p. m.
-- `votos.json` → `aviso`: está sin definir si votan solo las Terceras o las cuatro comisiones económicas (90). La página
-  cubre las Terceras (46) y lo dice. Si se confirman las Cuartas, hay que sumarlas (plantilla, hemiciclos y bloques).
+- `votos.json` trae las cuatro comisiones económicas: `senado`/`camara` = Terceras (15 y 31) y `senado4`/`camara4` =
+  Cuartas (15 y 29), 90 en total. La página tiene un botón «Las cuatro / Solo las Terceras» porque está sin definir
+  quién vota el primer debate (`aviso`). `build_personas.py` arma las cuatro plantillas desde la ficha de cada comisión
+  del Senado y el `IdComision` de la Cámara, y aborta si no cuadra con `camaras[*].total`.
 - Al tocar `ley-rescate-base.css` o `.js`, subir el `?v=` en las 12 páginas.

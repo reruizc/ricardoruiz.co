@@ -34,7 +34,7 @@ WIKI = {'José Manuel Restrepo': 'José Manuel Restrepo Abondano', 'Miguel Góme
         'Juan Camilo Restrepo': 'Juan Camilo Restrepo Salazar', 'Juan Daniel Oviedo': 'Juan Daniel Oviedo', 'Andrés Julián Rendón': 'Andrés Julián Rendón',
         'Luis Carlos Reyes': 'Luis Carlos Reyes Hernández', 'María Claudia Lacouture': 'María Claudia Lacouture', 'Jennifer Pedraza': 'Jennifer Pedraza'}
 BLOQUE = [('salvacion', 'sn'), ('centro democratico', 'cd'), ('conservador', 'con'), ('cambio radical', 'cr'), ('partido de la u', 'u'), ('liberal', 'lib'),
-          ('alianza social independiente', 'asi'), ('verde', 'verde'), ('pacto historico', 'pacto'), ('pa-vida|uraba|paz es vida', 'paz')]
+          ('alianza social independiente', 'asi'), ('verde', 'verde'), ('pacto historico', 'pacto'), ('pa-vida|uraba|paz es vida|asoambeima|consejo comunitario|mais|indigena', 'paz')]
 
 
 def norm(s):
@@ -120,32 +120,40 @@ def main():
         p = s['name'].split()
         return ' '.join(p[2:] + p[:2]) if len(p) > 2 else s['name']
     votos = json.loads((AQUI / 'votos.json').read_text())
+    # Las cuatro comisiones económicas: con mensaje de urgencia sesionan juntas Terceras y Cuartas (90), y cada
+    # una vota por separado. Claves: senado/camara = Terceras (las de siempre) · senado4/camara4 = Cuartas.
+    COMS = {3: ('senado', 'camara', 'Tercera'), 4: ('senado4', 'camara4', 'Cuarta')}
     for b in votos['bloques']:
-        b['plantilla'] = {'senado': [], 'camara': []}
+        b['plantilla'] = {k: [] for ks in COMS.values() for k in ks[:2]}
     por = {b['id']: b for b in votos['bloques']}
-    # ⚠ La lista de integrantes sale de la ficha de la Comisión Tercera (/commissions), no del commission_id
-    # de cada senador: en nov-2026 ese campo venía dañado para dos de los 15 (Martín Caicedo, 3040; Andrea
+    # ⚠ La lista de integrantes sale de la ficha de cada comisión (/commissions), no del commission_id de cada
+    # senador: en nov-2026 ese campo venía dañado para dos de los 15 de la Tercera (Martín Caicedo, 3040; Andrea
     # Padilla, 1016) y la gráfica mostró 13 senadores y 3 del Pacto cuando son 15 y 4.
-    com = next(c for c in json.loads(bajar('https://app.senado.gov.co/backend/api/public/v1/commissions?format=json')) if c['id'] == 3)
-    lista = [re.sub(r'\s*[—–-]\s*[^—–-]*$', '', l[1:]).strip() for l in com['description'].splitlines() if l.strip().startswith('*')]
-    sen3 = []
-    for n in lista:
-        t = [x for x in norm(n).split() if len(x) > 2]
-        hits = [s for s in sen if sum(x in norm(s['name']) for x in t) >= min(3, len(t))]
-        if len(hits) != 1:
-            raise SystemExit(f'Comisión Tercera: no casa «{n}» con un solo senador ({len(hits)})')
-        sen3.append(hits[0])
-    sueltos = [s['name'] for s in sen if str(s.get('commission_id')) == '3' and s not in sen3]
-    if sueltos:
-        raise SystemExit(f'senadores con commission_id 3 que la ficha no lista: {sueltos}')
-    for s in sen3:
-        n = nombre_sen(s)
-        por[bloque(s['party_name'])]['plantilla']['senado'].append(persona(n, s.get('image'), 'Senado de la República'))
-    for r in reps:
-        if 'ercera' in (r.get('Comision') or ''):
-            por[bloque(r['Partido'])]['plantilla']['camara'].append(persona(r['Nombre'], r.get('Imagen'), 'Cámara de Representantes'))
+    fichas = {c['id']: c for c in json.loads(bajar('https://app.senado.gov.co/backend/api/public/v1/commissions?format=json'))}
+    for cid, (ks, kc, nom) in COMS.items():
+        lista = [re.sub(r'\s*[—–-]\s*[^—–-]*$', '', l[1:]).strip() for l in fichas[cid]['description'].splitlines() if l.strip().startswith('*')]
+        sel = []
+        for n in lista:
+            t = [x for x in norm(n).split() if len(x) > 2]
+            hits = [s for s in sen if sum(x in norm(s['name']) for x in t) >= min(3, len(t))]
+            if len(hits) != 1:
+                raise SystemExit(f'Comisión {nom}: no casa «{n}» con un solo senador ({len(hits)})')
+            sel.append(hits[0])
+        sueltos = [s['name'] for s in sen if str(s.get('commission_id')) == str(cid) and s not in sel]
+        if sueltos:
+            raise SystemExit(f'senadores con commission_id {cid} que la ficha no lista: {sueltos}')
+        for s in sel:
+            por[bloque(s['party_name'])]['plantilla'][ks].append(persona(nombre_sen(s), s.get('image'), 'Senado de la República'))
+        for r in reps:
+            if r.get('IdComision') == cid:
+                por[bloque(r['Partido'])]['plantilla'][kc].append(persona(r['Nombre'], r.get('Imagen'), 'Cámara de Representantes'))
     for b in votos['bloques']:
-        assert len(b['plantilla']['senado']) == b['senado'] and len(b['plantilla']['camara']) == b['camara'], b['id']
+        for k in b['plantilla']:
+            b[k] = len(b['plantilla'][k])
+    for k, c in votos['camaras'].items():
+        n = sum(len(b['plantilla'][k]) for b in votos['bloques'])
+        if n != c['total']:
+            raise SystemExit(f'{c["nombre"]}: la plantilla trae {n} y votos.json dice {c["total"]}')
     (AQUI / 'votos.json').write_text(json.dumps(votos, ensure_ascii=False, indent=0))
 
     # Las voces: primero el registro oficial, después Wikipedia.
