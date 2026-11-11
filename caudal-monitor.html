@@ -60,7 +60,35 @@
   .mo-etapa i{flex:1; height:5px; border-radius:2px; background:var(--border)}
   .mo-etapa i.on{background:var(--teal)}
   .mo-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:1rem 0}
-  @media(max-width:700px){ .mo-kpis{grid-template-columns:repeat(2,1fr)} .mo-solo{margin-left:0} .mo-num{min-width:4rem} }
+  .mo-open{color:inherit; text-decoration:none; border-bottom:1px dotted var(--border2); cursor:none}
+  .mo-open:hover{color:var(--teal); border-color:var(--teal)}
+  /* ficha del proyecto */
+  .mo-ficha{position:fixed; inset:0; z-index:9000; display:flex; justify-content:flex-end; background:rgba(10,14,22,.35)}
+  .mo-ficha[hidden]{display:none}
+  .mo-fcard{width:min(640px,100%); height:100%; overflow-y:auto; background:var(--paper,#f6f5f1); border-left:1px solid var(--border2); padding:1.4rem 1.5rem 2.5rem; box-shadow:-12px 0 40px rgba(0,0,0,.15)}
+  .mo-fcard h3{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.15rem; line-height:1.3; margin:.4rem 0 .6rem}
+  .mo-fx{float:right; border:1px solid var(--border2); background:var(--card); border-radius:6px; padding:.3rem .6rem; cursor:none}
+  .mo-fsub{font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin:1.3rem 0 .45rem; font-weight:700}
+  .mo-fmeta{display:grid; grid-template-columns:repeat(2,1fr); gap:.5rem .9rem; font-size:.8rem; color:var(--ink2)}
+  .mo-fmeta b{display:block; font-size:.6rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+  .mo-deb{display:grid; grid-template-columns:repeat(4,1fr); gap:.35rem; margin:.3rem 0}
+  .mo-deb div{border:1px solid var(--border); border-radius:7px; padding:.45rem .5rem; font-size:.7rem; color:var(--ink3); background:var(--card); line-height:1.3}
+  .mo-deb div.ok{border-color:#15803d; background:#ecfdf3; color:#14532d}
+  .mo-deb div.ya{border-color:var(--teal); background:var(--teal-soft); color:var(--ink)}
+  .mo-deb small{display:block; font-size:.64rem; margin-top:.2rem}
+  .mo-tl{list-style:none; margin:0; padding:0 0 0 .9rem; border-left:2px solid var(--border)}
+  .mo-tl li{position:relative; padding:.35rem 0 .35rem .6rem; font-size:.8rem; color:var(--ink2)}
+  .mo-tl li::before{content:''; position:absolute; left:-1.32rem; top:.62rem; width:9px; height:9px; border-radius:50%; background:var(--border2)}
+  .mo-tl li.n3::before{background:#15803d} .mo-tl li.n2::before{background:#1d4ed8}
+  .mo-tl time{display:inline-block; min-width:4.6rem; color:var(--ink3); font-size:.72rem}
+  .mo-flinks{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.4rem}
+  .mo-flinks a{font-size:.78rem; border:1px solid var(--border2); border-radius:7px; padding:.4rem .7rem; text-decoration:none; background:var(--card)}
+  /* explorador */
+  .mo-filtros{display:flex; flex-wrap:wrap; gap:.5rem; margin:.6rem 0}
+  .mo-filtros select,.mo-filtros input{padding:.5rem .6rem; border:1px solid var(--border2); border-radius:7px; background:var(--card); color:var(--ink); font-size:.8rem}
+  .mo-filtros input{flex:1; min-width:200px}
+  .mo-mas{margin:.8rem auto 0; display:block}
+  @media(max-width:700px){ .mo-kpis{grid-template-columns:repeat(2,1fr)} .mo-solo{margin-left:0} .mo-num{min-width:4rem} .mo-deb{grid-template-columns:repeat(2,1fr)} .mo-fmeta{grid-template-columns:1fr} }
 </style>
 </head>
 <body class="caudal-app">
@@ -99,6 +127,7 @@
     <section class="mo-sec" id="sec-agenda">
       <div class="mo-h"><h2>① En agenda</h2><span class="mo-n" id="ag-n"></span>
         <label class="mo-solo"><input type="checkbox" id="ag-solo" /> solo lo que le toca o sigo</label></div>
+      <div class="mo-tabs" id="ag-tabs"></div>
       <div class="cob-note" style="margin:0">Órdenes del día publicados por Cámara y Senado. Una comisión que no publica su orden no aparece: eso no significa que no sesione.</div>
       <div id="ag-lista"></div>
     </section>
@@ -110,8 +139,20 @@
       <div id="mv-lista"></div>
     </section>
 
+    <section class="mo-sec" id="sec-explorar">
+      <div class="mo-h"><h2>③ Proyectos en trámite</h2><span class="mo-n" id="ex-n"></span></div>
+      <div class="mo-filtros">
+        <input id="ex-q" type="search" placeholder="Número o palabras del título (477, rescate, plataformas…)" />
+        <select id="ex-cam"><option value="">Las dos cámaras</option><option value="Senado">Radicado en Senado</option><option value="Cámara">Radicado en Cámara</option></select>
+        <select id="ex-etapa"></select>
+        <select id="ex-tema"><option value="">Todos los temas</option></select>
+        <label class="mo-solo" style="margin-left:0"><input type="checkbox" id="ex-solo" /> solo lo que le toca</label>
+      </div>
+      <div id="ex-lista"></div>
+    </section>
+
     <section class="mo-sec" id="sec-sigo">
-      <div class="mo-h"><h2>③ Los que sigues</h2><span class="mo-n" id="sg-n"></span></div>
+      <div class="mo-h"><h2>④ Los que sigues</h2><span class="mo-n" id="sg-n"></span></div>
       <div class="mo-search"><input id="sg-q" type="search" placeholder="Busca un proyecto de esta legislatura por número o palabras (477, rescate, plataformas…)" /></div>
       <ul class="mo-res" id="sg-res"></ul>
       <div id="sg-lista"></div>
@@ -124,6 +165,8 @@
       Caudal · una alianza entre <a href="index.html">RicardoRuiz.co</a> y <a href="https://cauce.co/" target="_blank" rel="noopener">Cauce</a>.
     </div>
   </main>
+
+  <div class="mo-ficha" id="mo-ficha" hidden><div class="mo-fcard" id="mo-fcard" role="dialog" aria-modal="true" aria-label="Ficha del proyecto"></div></div>
 
 <script src="caudal-comun.js?v=20261026b"></script>
 <script src="caudal-base.js?v=20261027"></script>
@@ -205,10 +248,97 @@
 
   function pintarTodo(){
     TERMS=ACT&&ACT.temas.length?terminosDe(ACT.temas):[];
-    pintarKpis(); pintarAgenda(); pintarMovs(); pintarSigo();
+    pintarKpis(); pintarAgenda(); pintarMovs(); pintarExplorar(); pintarSigo();
   }
 
   const hoyISO=new Date(Date.now()-5*3600e3).toISOString().slice(0,10);
+  let AG_VISTA=null, EX_N=25;
+  function manana(){ return new Date(Date.now()-5*3600e3+864e5).toISOString().slice(0,10); }
+  function lnk(ks,t){ ks=(ks||[]).filter(Boolean); return ks.length?`<a class="mo-open" data-k="${esc(ks[0])}">${esc(cap(t))}</a>`:esc(cap(t)); }
+
+  /* ── Proyectos en trámite: lista filtrable (como la consulta de regulaw, pero
+     con el estado oficial de las dos cámaras y el cruce con el cliente) ── */
+  function pintarExplorar(){
+    const q=norm($('ex-q').value), cam=$('ex-cam').value, et=$('ex-etapa').value, tema=$('ex-tema').value, solo=$('ex-solo').checked;
+    const num=($('ex-q').value.match(/^\s*(\d{1,4})\s*$/)||[])[1];
+    let terms=null;
+    if(tema){ const top=(D.tesauro||[]).find(t=>t.k===tema); terms=top?top.terms.map(norm).map(f=>f.split(' ').filter(w=>w.length>3).map(w=>w.length>5?w.slice(0,w.length-2):w)).filter(a=>a.length):null; }
+    const lista=D.proyectos.filter(p=>{
+      const e=p.etapa||{};
+      if(et==='vivos'&&e.fin) return false;
+      if(et==='fin'&&!e.fin) return false;
+      if(/^\d$/.test(et)&&(e.fin||String(e.n)!==et)) return false;
+      if(cam&&p.cam!==cam) return false;
+      if(num){ if(!p.ks.some(k=>k.slice(1).split('-')[0]===String(+num))) return false; }
+      else if(q&&!norm(p.t).includes(q)) return false;
+      if(terms){ const t=norm(p.t); if(!terms.some(ws=>ws.every(w=>t.includes(w)))) return false; }
+      if(solo&&!toca(p.t)) return false;
+      return true;
+    }).sort((a,b)=>(b.h&&b.h[0]?b.h[0][0]:b.fp||'').localeCompare(a.h&&a.h[0]?a.h[0][0]:a.fp||''));
+    $('ex-n').textContent=`${fmt(lista.length)} de ${fmt(D.proyectos.length)} · ordenados por el último movimiento`;
+    $('ex-lista').innerHTML=lista.slice(0,EX_N).map(p=>{ const e=p.etapa||{}, ult=p.h&&p.h[0];
+      return `<div class="mo-mov"><span class="mo-f">${esc(numTxt(p))}</span>
+        <span class="mo-t">${toca(p.t)?'<span class="mo-badge b-toca">le toca</span>':''}${sigo(p.ks)?'<span class="mo-badge b-sigo">sigues</span>':''}${lnk(p.ks,p.t)}
+          <small>${esc(e.fin||(D.etapas||[])[e.n-1]||'')}${p.com?` · ${esc(p.com)}`:''}${ult?` · último movimiento ${esc(fechaCorta(ult[0]))}: ${esc(ult[2])}`:''}</small></span>
+        <button class="mo-seg${sigo(p.ks)?' on':''}" data-ks="${esc(p.ks.join(','))}">${sigo(p.ks)?'Siguiendo':'Seguir'}</button></div>`; }).join('')
+      +(lista.length>EX_N?`<button class="mo-chip mo-mas" id="ex-mas">Ver ${Math.min(25,lista.length-EX_N)} más</button>`:'')
+      ||'<div class="mo-vacio">Ningún proyecto con esos filtros.</div>';
+    const mas=$('ex-mas'); if(mas) mas.onclick=()=>{ EX_N+=25; pintarExplorar(); };
+    bindSeg($('ex-lista'));
+  }
+
+  /* ── Ficha del proyecto: lo que dice el registro, su recorrido y su agenda ── */
+  function abrirFicha(k){
+    const p=POR_K[k]; if(!p) return;
+    const e=p.etapa||{}, deb=p.deb||[], hist=p.h||[], cs=citas(p);
+    const desdeCamara=p.cam==='Cámara'&&!p.ns;
+    const pasos=desdeCamara?['Comisión de la Cámara','Plenaria de la Cámara','Comisión del Senado','Plenaria del Senado']
+                           :['Comisión del Senado','Plenaria del Senado','Comisión de la Cámara','Plenaria de la Cámara'];
+    const fechaDe=paso=>{ const m=deb.find(d=>norm(d[0]).includes(norm(paso.split(' ')[0]))&&norm(d[0]).includes(norm(paso.split(' ').pop()))); return m?m[1]:''; };
+    let hechos=pasos.map(fechaDe), nHechos=hechos.filter(Boolean).length;
+    // la Cámara no publica fechas: si su estado dice plenaria, la comisión ya pasó
+    if(!nHechos&&desdeCamara&&/plenaria/i.test(p.est||'')){ hechos=['sí','','','']; nHechos=1; }
+    const sigue=e.fin?e.fin:nHechos>=4?'Conciliación o sanción presidencial':`Sigue: ${pasos[nHechos]}`;
+    const prox=cs.filter(c=>c.s.f>=hoyISO);
+    const rescate=p.ks.includes('C477-26')||p.ks.includes('S328-26');
+    const pl=p.ks[0], tq=shortQ(p.t);
+    $('mo-fcard').innerHTML=`<button class="mo-fx" id="mo-fx" aria-label="Cerrar">✕</button>
+      <div style="font-size:.75rem;color:var(--ink3)">${esc(numTxt(p))} · ${esc(p.cam==='Senado'?'radicado en el Senado':'radicado en la Cámara')}${p.tipo?` · ${esc(String(p.tipo).toLowerCase())}`:''}</div>
+      <h3>${esc(cap(p.t))}</h3>
+      ${toca(p.t)?`<span class="mo-badge b-toca">le toca a ${esc(ACT.nombre)}</span>`:''}
+      <div class="mo-fsub">Debates · ${nHechos} de 4 superados</div>
+      <div class="mo-deb">${pasos.map((x,i)=>`<div class="${hechos[i]?'ok':(i===nHechos&&!e.fin?'ya':'')}">${esc(x)}<small>${hechos[i]?(hechos[i]==='sí'?'superado':esc(fechaCorta(hechos[i]))):(i===nHechos&&!e.fin?'en curso':'pendiente')}</small></div>`).join('')}</div>
+      <div class="cob-note" style="margin:.2rem 0 0">${esc(sigue)}.</div>
+      <div class="mo-fsub">Estado oficial</div>
+      <div class="mo-fmeta">
+        <div><b>Senado</b>${esc(p.ns?p.est||'—':'aún no llega')}</div>
+        <div><b>Cámara</b>${esc(p.est_c||(p.cam==='Cámara'?p.est:'')||'aún no llega')}</div>
+        <div><b>Comisión</b>${esc(p.com||'—')}</div>
+        <div><b>Radicado</b>${esc(p.fp?fechaLarga(p.fp):'—')}</div>
+        ${(p.aut||[]).length?`<div style="grid-column:1/-1"><b>Autores</b>${esc(p.aut.join(', '))}</div>`:''}
+        ${(p.pon||[]).map(x=>`<div style="grid-column:1/-1"><b>Ponentes · ${esc(x[0])}</b>${esc(cap(x[1]))}</div>`).join('')}
+      </div>
+      <div class="mo-fsub">En agenda</div>
+      ${prox.length?prox.map(c=>`<div style="font-size:.82rem;margin:.2rem 0"><b>${esc(fechaLarga(c.s.f))}</b> · ${esc(c.s.o.ambito)} (${esc(c.s.o.corporacion)}), puesto ${c.x.i} de ${c.s.ps.length}${c.s.o.url?` · <a href="${esc(c.s.o.url)}" target="_blank" rel="noopener">orden del día ↗</a>`:''}</div>`).join('')
+        :'<div class="cob-note" style="margin:0">No aparece en los órdenes del día publicados.</div>'}
+      <div class="mo-fsub">Recorrido</div>
+      ${hist.length?`<ul class="mo-tl">${hist.slice(0,30).map(h=>`<li class="n${({aprobado:3,sancion:3,archivado:3,plenaria:2,ponencia:2,ponentes:2}[h[1]]||1)}"><time>${esc(fechaCorta(h[0]))}</time> ${esc(h[2])}</li>`).join('')}
+          ${p.fp?`<li><time>${esc(fechaCorta(p.fp))}</time> Radicado</li>`:''}</ul>`
+        :`<div class="cob-note" style="margin:0">El rastreo no ha registrado cambios de trámite desde que se radicó${p.fp?` (${esc(fechaLarga(p.fp))})`:''}.</div>`}
+      ${(p.doc||[]).length?`<div class="mo-fsub">Documentos en la Gaceta</div><div style="font-size:.8rem;color:var(--ink2)">${p.doc.map(d=>`${esc(d[0])}: ${esc(d[1])}`).join('<br>')}</div>`:''}
+      <div class="mo-fsub">Más</div>
+      <div class="mo-flinks">
+        <button class="mo-seg${sigo(p.ks)?' on':''}" data-ks="${esc(p.ks.join(','))}">${sigo(p.ks)?'Siguiendo':'Seguir este proyecto'}</button>
+        <a href="caudal.html?pl=${encodeURIComponent(pl)}&t=${encodeURIComponent(tq)}#congreso" target="_blank" rel="noopener">Ficha en Caudal · esquema de fuerzas e impacto ↗</a>
+        ${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">Texto o ficha oficial ↗</a>`:''}
+        ${rescate?'<a href="ley-de-rescate-avance.html" target="_blank" rel="noopener">Seguimiento de la Ley de Rescate ↗</a>':''}
+      </div>`;
+    $('mo-ficha').hidden=false;
+    $('mo-fx').onclick=cerrarFicha;
+    bindSeg($('mo-fcard'));
+    const u=new URL(location.href); u.searchParams.set('p',k); history.replaceState(null,'',u);
+  }
+  function cerrarFicha(){ $('mo-ficha').hidden=true; const u=new URL(location.href); u.searchParams.delete('p'); history.replaceState(null,'',u); }
   function sesiones(){
     const out=[];
     for(const o of ORD.ordenes||[]){
@@ -222,12 +352,18 @@
     const pr=proyDe([p.k,p.k2]), ks=pr?pr.ks:[p.k,p.k2].filter(Boolean);
     const t=pr?pr.t:(p.titulo||''), tc=toca(t), sg=sigo(ks);
     return {html:`<div class="mo-p${tc?' toca':''}"><span class="mo-num">${esc(p.numero||'')}</span>
-      <span class="mo-t">${tc?'<span class="mo-badge b-toca">le toca</span>':''}${sg?'<span class="mo-badge b-sigo">sigues</span>':''}${esc(cap(t))}
+      <span class="mo-t">${tc?'<span class="mo-badge b-toca">le toca</span>':''}${sg?'<span class="mo-badge b-sigo">sigues</span>':''}${lnk(ks,t)}
       ${pr?`<small>${esc(pr.est||'')} · puesto ${p.i} en el orden del día</small>`:`<small>puesto ${p.i} en el orden del día</small>`}</span>
       ${ks.length?`<button class="mo-seg${sg?' on':''}" data-ks="${esc(ks.join(','))}">${sg?'Siguiendo':'Seguir'}</button>`:''}</div>`, tc, sg};
   }
   function pintarAgenda(){
-    const solo=$('ag-solo').checked, ses=sesiones().filter(s=>s.f>=hoyISO);
+    const todas=sesiones().filter(s=>s.f>=hoyISO), man=manana();
+    const nHoy=todas.filter(s=>s.f===hoyISO).length, nMan=todas.filter(s=>s.f===man).length;
+    if(AG_VISTA===null) AG_VISTA=nHoy?'hoy':(nMan?'manana':'todo');
+    $('ag-tabs').innerHTML=[['hoy',`Hoy · ${nHoy}`],['manana',`Mañana · ${nMan}`],['todo',`Desde hoy · ${todas.length}`]]
+      .map(([k,t])=>`<button class="mo-chip${k===AG_VISTA?' on':''}" data-v="${k}">${t}</button>`).join('');
+    $('ag-tabs').querySelectorAll('.mo-chip').forEach(b=>b.onclick=()=>{ AG_VISTA=b.dataset.v; pintarAgenda(); });
+    const solo=$('ag-solo').checked, ses=todas.filter(s=>AG_VISTA==='hoy'?s.f===hoyISO:AG_VISTA==='manana'?s.f===man:true);
     let html='', dia='', n=0, nt=0;
     for(const s of ses){
       const rows=s.ps.map(pRow), vis=solo?rows.filter(r=>r.tc||r.sg):rows;
@@ -258,7 +394,7 @@
     $('mv-lista').innerHTML=lista.map(m=>{ const pr=proyDe(m.ks), tc=toca(m.t), sg=sigo(m.ks), ks=pr?pr.ks:m.ks;
       return `<div class="mo-mov"><span class="mo-f">${esc(fechaCorta(m.f))}<br>${esc(m.cam)}</span>
         <span class="mo-t"><span class="mo-badge b-${esc(m.tipo)}">${esc(NOM_T[m.tipo]||m.tipo)}</span>${tc?'<span class="mo-badge b-toca">le toca</span>':''}${sg?'<span class="mo-badge b-sigo">sigues</span>':''}
-          <b>${esc(pr?numTxt(pr):'')}</b> ${esc(cap(m.t))}<small>${esc(m.txt)}</small></span>
+          <b>${esc(pr?numTxt(pr):'')}</b> ${lnk(ks,m.t)}<small>${esc(m.txt)}</small></span>
         ${ks.length?`<button class="mo-seg${sg?' on':''}" data-ks="${esc(ks.join(','))}">${sg?'Siguiendo':'Seguir'}</button>`:''}</div>`; }).join('')
       ||`<div class="mo-vacio">${solo?'Nada de sus temas ni de lo que sigues se movió en esta categoría.':'Sin movimientos en esta categoría.'}</div>`;
     bindSeg($('mv-lista'));
@@ -279,7 +415,7 @@
       const rescate=p.ks.includes('C477-26')||p.ks.includes('S328-26');
       return `<div class="mo-ses"><div class="mo-ses-h">${esc(numTxt(p))}${toca(p.t)?' <span class="mo-badge b-toca">le toca</span>':''}
           <button class="mo-seg on" data-ks="${esc(p.ks.join(','))}" style="margin-left:auto">Dejar de seguir</button></div>
-        <div class="mo-p"><span class="mo-t">${esc(cap(p.t))}${barra}
+        <div class="mo-p"><span class="mo-t">${lnk(p.ks,p.t)}${barra}
           <small>Estado oficial: ${esc(p.est||'—')}${p.est_c?` · Cámara: ${esc(p.est_c)}`:''}${p.com?` · ${esc(p.com)}`:''}</small>
           <small>${ult?`Último movimiento (${esc(fechaCorta(ult.f))}): ${esc(ult.txt)}`:'Sin movimientos en los últimos días.'}</small>
           <small>${prox?`<b>En agenda:</b> ${esc(fechaLarga(prox.s.f))} · ${esc(prox.s.o.ambito)} (${esc(prox.s.o.corporacion)}), puesto ${prox.x.i}`:'No aparece en los órdenes del día publicados.'}</small>
@@ -301,6 +437,7 @@
       const ks=b.dataset.ks.split(',').filter(Boolean), ya=sigo(ks);
       SIGO=ya?SIGO.filter(k=>!ks.includes(k)):[...new Set([...SIGO,...ks])];
       guardar(); pintarTodo();
+      if(!$('mo-ficha').hidden){ const k=new URLSearchParams(location.search).get('p'); if(k) abrirFicha(k); }
     });
   }
   function buscar(q){
@@ -308,7 +445,7 @@
     if(qn.length<2){ res.innerHTML=''; return; }
     const num=q.match(/\d{1,4}/);
     const hits=D.proyectos.filter(p=>num?p.ks.some(k=>k.slice(1).split('-')[0]===String(+num[0])):norm(p.t).includes(qn)).slice(0,8);
-    res.innerHTML=hits.map(p=>`<li class="mo-p"><span class="mo-num">${esc(numTxt(p))}</span><span class="mo-t">${esc(cap(p.t))}<small>${esc(p.est||'')}</small></span>
+    res.innerHTML=hits.map(p=>`<li class="mo-p"><span class="mo-num">${esc(numTxt(p))}</span><span class="mo-t">${lnk(p.ks,p.t)}<small>${esc(p.est||'')}</small></span>
       <button class="mo-seg${sigo(p.ks)?' on':''}" data-ks="${esc(p.ks.join(','))}">${sigo(p.ks)?'Siguiendo':'Seguir'}</button></li>`).join('')
       ||'<li class="mo-vacio">Nada con eso en la legislatura 2026-2027.</li>';
     bindSeg(res);
@@ -322,6 +459,15 @@
 
   function wire(){
     $('ag-solo').onchange=pintarAgenda; $('mv-solo').onchange=pintarMovs;
+    $('ex-etapa').innerHTML='<option value="vivos">En trámite</option>'+(D.etapas||[]).map((t,i)=>`<option value="${i+1}">${esc(t)}</option>`).join('')+'<option value="fin">Archivados, retirados o a sanción</option><option value="">Todos</option>';
+    $('ex-tema').innerHTML='<option value="">Todos los temas</option>'+(D.tesauro||[]).map(t=>t.k).sort((a,b)=>a.localeCompare(b,'es')).map(k=>`<option value="${esc(k)}">${esc(k.charAt(0).toUpperCase()+k.slice(1))}</option>`).join('');
+    let te=null; $('ex-q').addEventListener('input',()=>{ clearTimeout(te); te=setTimeout(()=>{ EX_N=25; pintarExplorar(); },150); });
+    ['ex-cam','ex-etapa','ex-tema','ex-solo'].forEach(id=>$(id).onchange=()=>{ EX_N=25; pintarExplorar(); });
+    pintarExplorar();
+    document.addEventListener('click',ev=>{ const a=ev.target.closest('.mo-open'); if(a){ ev.preventDefault(); abrirFicha(a.dataset.k); } });
+    $('mo-ficha').addEventListener('click',ev=>{ if(ev.target.id==='mo-ficha') cerrarFicha(); });
+    document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&!$('mo-ficha').hidden) cerrarFicha(); });
+    const pk=new URLSearchParams(location.search).get('p'); if(pk&&POR_K[pk]) abrirFicha(pk);
     let tm=null; $('sg-q').addEventListener('input',e=>{ clearTimeout(tm); tm=setTimeout(()=>buscar(e.target.value),120); });
   }
 

@@ -1605,6 +1605,11 @@
     const temaInicial=(new URLSearchParams(location.search).get('tema')||'').trim();
     if(temaInicial) uniSearch(temaInicial);
     // ?q=<texto>#<pilar>: llega desde «Explorar una organización» (caudal-explorar.html)
+    // ?pl=C477-26&t=<palabras del título>: llega desde el Monitoreo del Congreso.
+    // Los ids de Cámara cambian cada día, así que se busca por título y se abre
+    // el resultado cuyo número coincide.
+    const plInicial=(new URLSearchParams(location.search).get('pl')||'').trim();
+    if(plInicial) abrirProyectoPorNumero(plInicial,(new URLSearchParams(location.search).get('t')||'').trim());
     const qInicial=(new URLSearchParams(location.search).get('q')||'').trim();
     if(qInicial && initialView) abrirPilarConQuery(initialView, qInicial);
     const uq=document.getElementById('uq'), ugo=document.getElementById('ugo');
@@ -1851,6 +1856,14 @@
   function cerrar(){
     if(modalCard.dataset.pfWizard==='1'){ PF_DRAFT=null; delete modalCard.dataset.pfWizard; }
     modal.classList.remove('on');
+  }
+  async function abrirProyectoPorNumero(pl,titulo){
+    const m=String(pl).match(/^([CS])(\d+)-(\d{2})$/i); if(!m||!titulo) return;
+    const cam=m[1].toUpperCase(), num=+m[2], aa=m[3];
+    const casa=v=>{ const x=String(v||'').match(/0*(\d{1,4})\s*\/\s*(?:20)?(\d{2})/); return x&&+x[1]===num&&x[2]===aa; };
+    let r; try{ r=await call({action:'buscar',query:titulo}); }catch(e){ return; }
+    const h=(r&&r.resultados||[]).find(x=>cam==='C'?casa(x.nc):casa(x.ns))||(r&&r.resultados||[]).find(x=>casa(x.nc)||casa(x.ns));
+    if(h) abrirProyecto(h.id,h.tb||'pdly');
   }
   async function abrirProyecto(id,tb){
     modalCard.innerHTML='<button class="modal-close">✕</button><div class="llm-load" style="padding:1.5rem">Cargando ficha <span class="dots"><span></span><span></span><span></span></span></div>';

@@ -90,6 +90,36 @@ def etapa(estado, rec=None):
     return {'n': n}
 
 
+def vacio(v):
+    """El registro del Senado escribe '0000-00-00' donde no hay fecha."""
+    return not str(v or '').strip() or str(v).startswith('0000')
+
+
+def fecha_iso(v):
+    v = str(v or '').strip().replace('/', '-')[:10]
+    return '' if vacio(v) else v
+
+
+def lista_autores(r):
+    if r.get('autores') and isinstance(r['autores'], list):
+        return [a.get('nombre', '') for a in r['autores'] if isinstance(a, dict) and a.get('nombre')][:8]
+    a = re.sub(r'\bH\.\s?[SR]\.\s*', '', str(r.get('autor') or ''))
+    return [x.strip().title() for x in re.split(r',|\by\b', a) if x.strip()][:8]
+
+
+DEBATES = [('fecha_de_aprobacion_primer_debate', 'Primer debate · Comisión del Senado'),
+           ('fecha_de_aprobacion_segundo_debate', 'Segundo debate · Plenaria del Senado'),
+           ('fecha_de_aprobacion_primer_debate_camara', 'Primer debate · Comisión de la Cámara'),
+           ('fecha_de_aprobacion_segundo_debate_camara', 'Segundo debate · Plenaria de la Cámara'),
+           ('fecha_de_conciliacion_senado', 'Conciliación · Senado'),
+           ('fecha_de_conciliacion_camara', 'Conciliación · Cámara')]
+PONENTES_CAMPOS = [('ponente_primer_debate', 'primer debate en el Senado'), ('ponente_segundo_debate', 'segundo debate en el Senado'),
+                   ('ponente_primer_debate_camara', 'primer debate en la Cámara'), ('ponente_segundo_debate_camara', 'segundo debate en la Cámara')]
+DOCS = [('exposicion_de_motivos', 'Exposición de motivos'), ('primera_ponencia', 'Ponencia para primer debate'),
+        ('segunda_ponencia', 'Ponencia para segundo debate'), ('texto_plenaria', 'Texto de plenaria'),
+        ('conciliacion', 'Conciliación'), ('objeciones', 'Objeciones')]
+
+
 def leer_jsonl(p):
     out = []
     if not Path(p).exists():
@@ -116,6 +146,11 @@ def proyectos():
              'tipo': r.get('tipo_de_ley') or '', 'cam': 'Senado',
              'url': r.get('texto_radicado_url') or ''}
         x['etapa'] = etapa(x['est'], r)
+        x['aut'] = lista_autores(r)
+        x['deb'] = [[lbl, fecha_iso(r.get(c))] for c, lbl in DEBATES if fecha_iso(r.get(c))]
+        x['pon'] = [[lbl, re.sub(r'\bH\.\s?[SR]\.\s*', '', str(r.get(c)))] for c, lbl in PONENTES_CAMPOS
+                    if str(r.get(c) or '').strip() and 'gaceta' not in norm(r.get(c))]
+        x['doc'] = [[lbl, str(r.get(c)).strip()] for c, lbl in DOCS if str(r.get(c) or '').strip()]
         lista.append(x)
         for k in ks:
             por_k[k] = x
@@ -131,6 +166,8 @@ def proyectos():
                 prev['ks'].append(kc)
             prev['nc'] = prev['nc'] or r.get('numero_camara')
             prev['est_c'] = r.get('estado') or ''
+            if not prev.get('aut'):
+                prev['aut'] = lista_autores(r)
             continue
         x = {'ks': [k for k in (kc, ks_) if k], 'nc': r.get('numero_camara') or '',
              'ns': r.get('numero_senado') or '', 't': re.sub(r'\s+', ' ', r['titulo']).strip(' “”"'),
@@ -138,6 +175,9 @@ def proyectos():
              'tipo': r.get('tipo') or '', 'cam': 'Cámara',
              'url': f"https://www.camara.gov.co/{r['link_web']}" if r.get('link_web') else ''}
         x['etapa'] = etapa(x['est'])
+        x['aut'] = lista_autores(r)
+        x['deb'], x['pon'] = [], []
+        x['doc'] = [['Gaceta', f"{g.get('num')}/{g.get('anio')}"] for g in (r.get('gacetas') or []) if isinstance(g, dict)][:6]
         lista.append(x)
         for k in x['ks']:
             por_k[k] = x
@@ -172,8 +212,7 @@ def _tipo_estado(ahora):
     return 'estado'
 
 
-def movimientos(dias, hoy, por_k):
-    desde = hoy - dt.timedelta(days=dias)
+def movimientos(desde, por_k):
     out = []
 
     def add(fecha, cam, ks, titulo, tipo, txt, antes='', ahora=''):
@@ -200,8 +239,10 @@ def movimientos(dias, hoy, por_k):
             de = c.get('deltas') or {}
             for campo, v in de.items():
                 antes, ahora = (v or {}).get('antes') or '', (v or {}).get('ahora') or ''
-                if not str(ahora).strip():
+                if vacio(ahora):
                     continue  # la fuente vació el campo un día: es ruido, no trámite
+                if vacio(antes):
+                    antes = ''
                 if campo in APROB and not antes:
                     tipo, txt = APROB[campo]
                     add(fecha, 'Senado', ks, c.get('titulo'), tipo, txt, antes, ahora)
@@ -260,7 +301,18 @@ def main():
     a = ap.parse_args()
     hoy = dt.date.today()
     lista, por_k = proyectos()
-    movs = movimientos(a.dias, hoy, por_k)
+    # el recorrido de cada proyecto usa TODO lo que registró el rastreo en la
+    # legislatura; el feed de «lo que se movió» solo los últimos N días
+    todos = movimientos(dt.date(2026, 7, 20), por_k)
+    corte = (hoy - dt.timedelta(days=a.dias)).isoformat()
+    movs = [m for m in todos if m['f'] >= corte]
+    for m in todos:
+        p = next((por_k[k] for k in m['ks'] if k in por_k), None)
+        if p is not None and m['tipo'] != 'gaceta':
+            p.setdefault('h', []).append([m['f'], m['tipo'], m['txt']])
+    for p in lista:
+        if p.get('h'):
+            p['h'].sort(reverse=True)
     data = {
         'v': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
         'legislatura': LEG, 'ventana_dias': a.dias, 'etapas': ETAPAS,
