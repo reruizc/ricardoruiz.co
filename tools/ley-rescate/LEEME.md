@@ -7,6 +7,8 @@ Al tocar la base, subir el `?v=` en las ocho.
 ```
 temas.json          libro de códigos: 24 temas que agrupan los 106 artículos (nombre, artículos, página, nota)
 articulos.json      los 106 artículos con página y tema · lo genera build_articulos.py
+proyecto.json       ficha fija del proyecto. `ponentes_prensa`: ponentes que reporta la prensa mientras la ficha de la Cámara no los
+                    registre; el hub los muestra con su fuente y NO marca la etapa. Borrarlo cuando la ficha los traiga.
 hitos.json          bitácora curada a mano. Un hito con "etapa":"pon|inf|anu|c1|p2|c3|p4|con|san" marca esa etapa como hecha
 verificaciones.json lo que dijo un actor contra el texto radicado (Tabla 14, p. 204). El hub pinta la más reciente
 voces.json          declaraciones verificadas una por una (p: a apoya · r rechaza · m reparos · i sin definir · g: con congreso · pub público · pri privado · n: nivel 5-2 del eje de poder · k: rótulo corto · al: nombres para contar menciones)
@@ -95,3 +97,16 @@ Orden: `ollama serve` · `prensa.py` · `gacetas.py` (~25 min) · `clasificar.py
   es de impuestos (`TEMA`).
 - `EXCLUIR` en `build_historia.py`: titulares que el modelo clasificó con postura y, revisados a mano, son de otro tema.
 - ⚠ `qwen3.8:27b-mlx` responde 501 con `format: json`: usar `qwen3.8:27b`.
+
+## Revisión general del 11-nov-2026 (trampas que salieron)
+
+- `.g{min-width:640px}` del análisis (≤720 px) se aplicaba a TODO `.g`: los filtros de la discusión y de las fuerzas y el
+  termómetro del hub se desbordaban en celular. Ahora es `svg.g`. Una clase corta compartida entre módulos se pisa.
+- `.res` (rótulo de las tributarias: mayúscula, sin salto) pisaba `.ficha .res`: el resumen del tema en la discusión salía
+  en mayúscula y en una sola línea de 1.000 px. `.ficha .res` ahora reinicia esas propiedades.
+- `.ant-scroll` necesita `position:relative`: sin eso los hijos posicionados de la matriz escapan del scroll y ensanchan la página.
+- Los contadores de días usan la fecha real de Bogotá (`E.hoy` se corrige en `pagina()`; `E.dato` guarda la del dato):
+  el cron de las 06:15 lo está corriendo GitHub entre el mediodía y las 4:30 p. m.
+- `votos.json` → `aviso`: está sin definir si votan solo las Terceras o las cuatro comisiones económicas (90). La página
+  cubre las Terceras (46) y lo dice. Si se confirman las Cuartas, hay que sumarlas (plantilla, hemiciclos y bloques).
+- Al tocar `ley-rescate-base.css` o `.js`, subir el `?v=` en las 12 páginas.

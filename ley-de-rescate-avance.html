@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261111b" />
   <script defer src="/track.js"></script>
   <style>
   .vf-q{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.4rem;align-items:start}
@@ -52,13 +52,13 @@
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261107"></script>
+  <script src="ley-rescate-base.js?v=20261111"></script>
   <script>
 LR.pagina('hub', E => {
-  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia;
+  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia, PP = E.proyecto.ponentes_prensa, ppn = PP ? PP.lista.length : 0;
   const K = [['Dónde está', T.estado || 'Sin dato', `Sigue: ${ahora ? ahora.nom.toLowerCase() : 'sancionada'}${U ? ' · con mensaje de urgencia' : ''}`, ''],
     ['Próxima votación', ag.length ? larga(ag[0].fecha) : 'Sin fecha', ag.length ? esc(ag[0].ambito) : 'No aparece en ningún orden del día publicado hasta el ' + corta((T.ordenes_hasta || E.hoy).slice(0, 10)), ag.length ? '' : 'alerta'],
-    ['Ponentes', pon.length ? String(pon.length) : 'Sin publicar', pon.length ? esc(pon.slice(0, 2).join(' · ')) : 'La ficha oficial todavía no los trae', ''],
+    ['Ponentes', pon.length ? String(pon.length) : ppn ? `${ppn} ${PP.donde}` : 'Sin publicar', pon.length ? esc(pon.slice(0, 2).join(' · ')) : ppn ? `${PP.lista.map(x => `${esc(x.n)} (${esc(x.p)})`).join(' y ')}, según <a href="${esc(PP.url)}" target="_blank" rel="noopener">${esc(PP.fuente)}</a>. ${esc(PP.falta)}` : 'La ficha oficial todavía no los trae', ''],
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
   $('#kpis').innerHTML = K.map(([l, v, d, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${esc(v)}</div><div class="d">${d}</div></div>`).join('');
   const TT = E.termometro || {}, idx = o => { const p = (o.a || 0) + (o.r || 0) + (o.m || 0); return p ? Math.round(100 * ((o.r || 0) + (o.m || 0) / 2) / p) : null; };
@@ -80,13 +80,13 @@ LR.pagina('hub', E => {
   $('#termos').innerHTML = velo('todo', 'Todo', true) + '<div class="velo-par">' + velo('prensa', 'Prensa') + velo('redes', 'Redes') + '</div><div class="termo-esc"><span><i style="background:' + color(0) + '"></i>0 · todo apoya</span><span><i style="background:' + color(50) + '"></i>50 · dividido</span><span><i style="background:' + color(100) + '"></i>100 · todo rechaza</span></div>';
   const TD = Object.entries(E.termometro_dia || {}).filter(([d, o]) => (o.a || 0) + (o.r || 0) + (o.m || 0) >= 20).slice(-10);
   $('#tdias').innerHTML = TD.map(([d, o]) => { const v = idx(o); return `<div data-tip="${corta(d)}: ${v} de 100 · ${num((o.a || 0) + (o.r || 0) + (o.m || 0))} textos con postura"><i style="height:${Math.max(4, v)}%;background:${color(v)}"></i><span>${corta(d)}</span></div>`; }).join('') || '<p class="vacio">Hace falta más de un día con datos.</p>';
-  const Lc = E.lectura || {}; $('#lect').innerHTML = `<h3>${esc(Lc.titular || 'Seguimiento del proyecto')}</h3>${(Lc.lectura || []).map(p => `<p>${esc(p)}</p>`).join('')}<small>Lectura ${esc(Lc.origen || 'automática')} del ${corta(Lc.fecha || E.hoy)}. No predice el voto.</small>`;
+  const Lc = E.lectura || {}; $('#lect').innerHTML = `<h3>${esc(Lc.titular || 'Seguimiento del proyecto')}</h3>${(Lc.lectura || []).map(p => `<p>${esc(p)}</p>`).join('')}<small>Lectura ${esc(Lc.origen || 'automática')} del ${corta(Lc.fecha || E.dato || E.hoy)}. No predice el voto.</small>`;
   const { bloques, camaras } = E.votos, cuenta = (c, p) => bloques.filter(b => b.post === p).reduce((s, b) => s + b[c], 0);
   const tSi = c => bloques.filter(b => b.post === 'si' || (b.post === 'sin' && ['si', 'aj'].includes(b.tiende))).reduce((s, b) => s + b[c], 0);
   const temas = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, 'todo') })), top = [...temas].sort((a, b) => b.o.n - a.o.n)[0];
   const apoy = temas.filter(x => x.o.post >= 20).sort((a, b) => b.o.apoya / b.o.post - a.o.apoya / a.o.post)[0];
   const rNorm = dias(E.hoy, ULT.normal), rUrg = dias(E.hoy, ULT.urgencia);
-  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length ? 'Ya tiene ponentes.' : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : 'Sin fecha de votación.'}`],
+  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length ? 'Ya tiene ponentes.' : ppn ? `${PP.lista.map(x => esc(x.n)).join(' y ')} son ponentes en el Senado desde el ${corta(PP.fecha)}; ${esc(PP.falta_corta)}.` : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : 'Sin fecha de votación.'}`],
     ['Reloj', U ? `El Gobierno radicó <b>mensaje de urgencia</b> el ${corta(U.fecha)}: las comisiones económicas de Cámara y Senado la estudian juntas y quedan <b>${Math.max(rUrg, 0)} días</b> para que el primer debate alcance antes del 16 de diciembre. La Constitución les pide decidir en 30 días.` : rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
     ['Votos', `Declarados en contra: ${cuenta('senado', 'no')} de ${camaras.senado.total} en Senado y ${cuenta('camara', 'no')} de ${camaras.camara.total} en Cámara. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${tSi('senado')} de ${camaras.senado.total} en Senado y ${tSi('camara')} de ${camaras.camara.total} en Cámara: hacen falta ${camaras.senado.mayoria} y ${camaras.camara.mayoria}.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]

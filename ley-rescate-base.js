@@ -90,6 +90,8 @@
     chasis(id);
     const c = $('#carga'); if (c) c.innerHTML = mar(['Leyendo la ficha de la Cámara…', 'Sumando prensa y redes…', 'Casi listo…']);
     fetch(URL_DATOS, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(E => {
+      // La corrida diaria llega a veces en la tarde: los contadores de días usan la fecha real de Bogotá; E.dato guarda la del dato.
+      E.dato = E.hoy; const hb = new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 10); if (hb > E.hoy) E.hoy = hb;
       $('#carga').hidden = true; $('#app').hidden = false; sello(E); pintar(E);
       if (LOCAL) document.querySelectorAll('a[href^="ley-de-rescate-"]').forEach(a => { if (!a.href.includes('local=1')) a.href = a.getAttribute('href').replace(/(\.html)(#.*)?$/, '$1?local=1$2'); });
     }).catch(e => { $('#carga').textContent = 'El seguimiento no está disponible en este momento. Intente de nuevo en unos minutos.'; console.error(e); });

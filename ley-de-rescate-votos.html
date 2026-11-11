@@ -12,13 +12,15 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261111b" />
   <style>
     /* Sigla del partido pegada a cada cara: no todos conocen la cara de cada congresista. */
     /* La fila de arriba del hemiciclo sobresale de la caja (la cara se centra en el borde): sin este margen pisa el título. */
     .hemi-box{margin-top:calc(.6rem + 5%)}
     .as{overflow:visible}.as .cara{border-radius:50%;overflow:hidden}
     .as .ptd{position:absolute;right:-14%;bottom:-10%;font:700 clamp(.44rem,1.05vw,.62rem)/1 'HN',Helvetica,Arial,sans-serif;letter-spacing:.02em;padding:.18em .32em;border-radius:3px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;z-index:2;white-space:nowrap}
+    .vt-aviso{margin-top:1.2rem;padding:.8rem 1rem;border-radius:10px;background:#fff8e6;border:1px solid #e6c56a;font-size:.9rem;line-height:1.5;color:var(--ink)}
+    .vt-aviso b{font-weight:700}
     .ley-pt{display:flex;flex-wrap:wrap;gap:.35rem .9rem;margin:.2rem 0 1.2rem;font-size:.74rem;color:var(--ink2)}
     .ley-pt span{display:inline-flex;align-items:center;gap:.35rem}
     .ley-pt .ptd{position:static;font:700 .62rem/1 'HN',Helvetica,Arial,sans-serif;padding:.2em .36em;border-radius:3px}
@@ -31,6 +33,7 @@
     <h1>Haga la cuenta usted mismo</h1>
     <p class="lead">La ley se vota primero en las Comisiones Terceras. <b>Toque a cada congresista</b> para marcar si apoya, rechaza o sigue sin definir, y vea si el proyecto pasa. El punto de partida solo marca a quien habló como bancada: nadie ha votado todavía. El <b>borde punteado</b> dice hacia dónde tiende cada bancada indecisa, con la razón en su tarjeta.</p>
     <div id="app" hidden>
+      <p class="vt-aviso" id="aviso" hidden></p>
       <div class="esc" id="esc"></div>
       <div class="panel"><div class="esc-top"><div class="pills" id="presets"></div><button class="pill" id="copiar">Copiar enlace del escenario</button></div>
         <div class="hemis" id="com"></div>
@@ -41,7 +44,7 @@
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261107"></script>
+  <script src="ley-rescate-base.js?v=20261111"></script>
   <script>
 const ORDEN = ['pacto', 'verde', 'paz', 'lib', 'asi', 'u', 'con', 'cr', 'cd', 'sn'];
 const FILAS = { senado: { f: [[43, 84, 9], [26, 50, 6]], w: 10.6 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
@@ -78,6 +81,7 @@ LR.pagina('votos', E => {
   const m0 = location.hash.match(/e=([sn.]+)/); if (m0 && m0[1].length === todos.length) { todos.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); }
   $('#copiar').onclick = async ev => { const c = todos.map(m => ({ si: 's', no: 'n', sin: '.' }[est(m)])).join(''), u = location.origin + location.pathname + '#e=' + c; history.replaceState(null, '', '#e=' + c); try { await navigator.clipboard.writeText(u); ev.target.textContent = 'Enlace copiado'; } catch { ev.target.textContent = 'Copie la dirección de esta página'; } setTimeout(() => ev.target.textContent = 'Copiar enlace del escenario', 2200); };
   $('#aparte').textContent = $('#aparte').textContent.replace(/La mayoría de \d+ y \d+/, `La mayoría de ${camaras.senado.mayoria} y ${camaras.camara.mayoria}`);
+  if (E.votos.aviso) { $('#aviso').hidden = false; $('#aviso').innerHTML = '<b>Ojo:</b> ' + esc(E.votos.aviso); }
   $('#ley-pt').innerHTML = ORDEN.map(id => `<span>${chip(id)}${esc(bl(id).nombre)}</span>`).join('');
   arma(); pinta();
 });
