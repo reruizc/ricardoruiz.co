@@ -26,17 +26,17 @@ C = {
     'fecha': '2026-11-10',
     'meta': ['La tributaria en una página', '10 de noviembre de 2026'],
     'marca': 'Ley de Rescate · PL 477 de 2026 Cámara · desde la tarde del lunes 9',
-    'titulo': 'Liberales y uribistas le cierran la puerta al IVA a los alimentos, y el Gobierno negocia un crédito con el FMI',
-    'hl': 'y el Gobierno negocia un crédito con el FMI',
-    'lead': 'Lo que pasó entre la tarde del lunes 9 y el martes 10. Primer movimiento del trámite: Blu Radio '
-            'informa que David Barguil (Conservador) fue designado ponente; la ficha de la Cámara aún no lo registra.',
+    'titulo': 'Liberales, conservadores y uribistas cierran la puerta al IVA a los alimentos; el Gobierno negocia con el FMI',
+    'hl': 'el Gobierno negocia con el FMI',
+    'lead': 'Lo que pasó entre la tarde del lunes 9 y el martes 10. Primer movimiento del trámite: el Senado designó ponentes '
+            'a David Barguil (Conservador) y Carlos Mario Farelo (Cambio Radical). En la Cámara todavía no hay.',
     'frentes': [
         {'dir': 'En el Congreso', 'color': '#d9480f', 'que': 'Nadie pone la cara por el IVA a la canasta',
-         'tx': 'El Partido Liberal pide aplazar la rebaja de renta a empresas y no pasar alimentos ni insumos '
-               'del campo al 19 %. El borrador del Centro Democrático quita 10 impuestos y lo compensa con un «bono forzoso».'},
+         'tx': 'Liberales y conservadores piden no pasar alimentos ni insumos del campo al 19 %; los conservadores proponen '
+               'vender ISA. El borrador del Centro Democrático quita 10 impuestos y lo compensa con un «bono forzoso».'},
         {'dir': 'En el Gobierno', 'color': '#2b5672', 'que': '«Operación Rescate» y crédito del FMI',
          'tx': 'Gómez promete un recorte de 1 punto del PIB; según la tabla del proyecto ese punto llega en 2030. '
-               'Bloomberg: se negocia un stand-by de unos US$15.000 millones. Hacienda no comenta.'},
+               'Bloomberg: se negocia un stand-by de unos US$15.000 millones; Hacienda dice que no se han discutido montos.'},
         {'dir': 'Las alertas', 'color': '#8a6d1c', 'que': 'El CARF dice que no alcanza',
          'tx': 'Pide un ajuste de 4 puntos del PIB y ve un déficit de hasta 9,5 % en 2027. Petro le ofreció '
                'al Centro Democrático una alianza contra la ley; Uribe la rechazó.'},
@@ -50,14 +50,14 @@ C = {
     'centro': 'Las mesas técnicas de esta semana definen el texto que llega al primer debate. Con el IVA a los '
               'alimentos sin quién lo vote, la pregunta es con qué se reemplaza ese recaudo.',
     'fechas': [
-        {'d': 'Hoy', 't': 'Barguil, ponente según Blu Radio; falta que lo registre la ficha'},
         {'d': 'Esta semana', 't': 'Mesas técnicas Gobierno y comisiones económicas'},
         {'d': 'Jue 12', 't': 'La subcomisión del Centro Democrático fija postura'},
-        {'d': 'Jue 19', 't': 'Paro nacional convocado por la CUT'},
+        {'d': 'Jue 19', 't': 'Paro de la CUT; Petro también llama a marchar'},
+        {'d': 'Fin de noviembre', 't': 'Debate conjunto de las comisiones, según La República'},
         {'d': 'Mié 16 dic', 't': 'Cierra el primer periodo de sesiones'},
     ],
     'fuentes': 'Fuentes: Portafolio (9 y 10-nov) · Infobae (10-nov) · La República (9-nov, CARF y FMI vía Bloomberg) · '
-               'Valora Analitik (9-nov) · El Nuevo Siglo (9-nov) · Blu Radio (10-nov) · Tabla 14 del PL 477, p. 204',
+               'Valora Analitik (9-nov) · El Nuevo Siglo (9 y 10-nov) · El Tiempo y Minuto60 (10-nov) · Tabla 14 del PL 477, p. 204',
 }
 
 
