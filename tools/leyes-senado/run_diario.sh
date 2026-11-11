@@ -28,6 +28,7 @@
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
 #   ritmo                     build_ritmo.py              monitor de ritmo (lee dist, va tras el dataset)
 #   congreso_claro_activos    congreso-claro/build_datos.py  proyectos activos por comisión (página ciudadana)
+#   afluente_gobierno         afluente/build_gobierno.py     consultas y normas del Gobierno (afluente.html)
 #   monitor_congreso          caudal/monitor/build_monitor.py  agenda y movimientos (caudal-monitor.html)
 #   gacetas_enumera/texto/build/upload  enumerar_gacetas.py …  Gaceta del Congreso (ventana de 45 días)
 #   control_fetch/build/upload  harvest_jurisprudencia.py  Corte Constitucional (una vez al día)
@@ -887,6 +888,16 @@ etapa() {
   else
     etapa --nombre ejecutivo_upload --omitida "no hay índice nuevo (rc=$rc_ej): en S3 queda el de ayer"
   fi
+
+  # ── Afluente · «El Gobierno» (afluente.html) ──
+  # Borradores en consulta pública (SUCOP + sitios de las entidades), agendas
+  # regulatorias en consulta y normas expedidas de los últimos 60 días, en un
+  # JSON PÚBLICO. Lee de S3 lo que acaban de subir sucop_upload, entidades_build
+  # y ejecutivo_upload, así que va después de los tres. Si algo viene vacío sale
+  # con 1 y no sube: la página sigue con el JSON anterior.
+  etapa --nombre afluente_gobierno --timeout 300 \
+        --desc "Afluente · consultas abiertas y normas del Gobierno → S3 público" \
+        -- python3 tools/afluente/build_gobierno.py --subir
 
   # ── temas del momento (chips de la búsqueda de Caudal) ──
   # Prensa política + radicados de la semana + consultas SUCOP abiertas → 8
