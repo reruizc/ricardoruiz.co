@@ -24,7 +24,7 @@ FILAS = [
     ('Gobierno', 'Gómez: «el pago efectivo empieza con ingresos de cerca de $5 millones al mes».',
      'Abre la puerta a cambios («bienvenidas sean las alternativas»), sin nada específico sobre renta.', 'gira'),
     ('Centro Democrático', 'Voces sueltas en contra. Posada: «No cuenten conmigo». Briceño: «no pienso apoyarlos».',
-     'Postura de bancada. S. Castro: «no apoyaríamos nada que pueda afectar los ingresos de los sectores de clase media».', 'endurece'),
+     'Postura de bancada. Berrío: no a ampliar quiénes declaran y pagan. S. Castro: nada que afecte «los ingresos de los sectores de clase media».', 'endurece'),
     ('Paloma Valencia', 'En contra de subir impuestos, en general.',
      '«El IVA y la renta a las personas afectan la capacidad de la clase media». Critica quitar la deducción por dependientes.', 'endurece'),
     ('Salvación Nacional', 'Castellanos: «No apoyaremos […] más cargas tributarias a la clase media».', 'Sin cambio conocido.', 'igual'),
@@ -37,7 +37,7 @@ FILAS = [
 ETQ = {'igual': ('Igual', '#8a8f99'), 'endurece': ('Se endurece', '#b4361f'), 'gira': ('Se abre', '#c98a1c')}
 
 FUENTES = ('Articulado del PL 477 de 2026 · El País (1-nov) · La FM (1 y 12-nov) · Infobae (31-oct, 11 y 12-nov) · '
-           'Semana y La Razón (30-oct) · El Tiempo (11-nov) · X de Andrea Padilla (5-nov).')
+           'Semana y La Razón (30-oct) · El Tiempo (11-nov) · El Nuevo Siglo (9-nov) · X de Andrea Padilla (5-nov).')
 
 
 def construir():
