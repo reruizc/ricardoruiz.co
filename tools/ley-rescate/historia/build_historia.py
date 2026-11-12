@@ -33,6 +33,42 @@ def postura(c):
     if resto and resto[0][1] == n1: return 'm'
     return p1
 
+def agrega_2026(celda, voces, votos):
+    """La columna 2026 sale de lo curado a mano: voces.json (gremios) y votos.json (bancadas)."""
+    for v in voces:
+        a = VOZ26.get(v.get('k'))
+        if not a: continue
+        p, inf = (v['t'], True) if v['p'] == 'i' and v.get('t') else (v['p'], False)
+        if p == 'i': continue
+        c = celda(a, 'r2026'); c['c'][p] += 1; c['inferida'] = inf
+        c['ev'].append({'src': 'curada', 'p': p, 't': v['x'], 'f': v['f'], 'u': v.get('u', '')})
+    for b in votos.get('bloques', []):
+        a = b['id']
+        if a not in {x[0] for x in ACTORES}: continue
+        p = {'si': 'm' if 'ajust' in b.get('nota', '') else 'a', 'no': 'r'}.get(b['post']) or TIENDE.get(b.get('tiende'))
+        if not p: continue
+        c = celda(a, 'r2026'); c['c'][p] += 1; c['inferida'] = b['post'] == 'sin'
+        c['ev'].append({'src': 'curada', 'p': p, 't': b['nota'] + (' Inclinación: ' + b['por'] if b.get('por') else ''), 'f': 'Seguimiento de la Ley de Rescate'})
+
+
+def refrescar_2026(fh, voces, votos):
+    """Rehace solo la columna 2026 de un fuerzas-historicas.json ya armado. La llama rastreo.py en cada corrida,
+    porque las épocas anteriores necesitan los archivos de Bases de datos/ y el modelo local, y 2026 no:
+    sin esto, la columna se quedaba con lo del día en que se corrió build_historia.py (pasó entre el 6 y el 12-nov)."""
+    celdas = collections.defaultdict(dict)
+    def celda(a, r): return celdas[a].setdefault(r, {'ev': [], 'c': collections.Counter()})
+    agrega_2026(celda, voces, votos)
+    for a, rs in fh.get('celdas', {}).items():
+        rs.pop('r2026', None)
+    for a, rs in celdas.items():
+        c = rs['r2026']; p = postura(c['c'])
+        if not p: continue
+        fh.setdefault('celdas', {}).setdefault(a, {})['r2026'] = {k: v for k, v in {'p': p, 'n': dict(c['c']), 'inferida': c.get('inferida') or None, 'ev': c['ev'][:8]}.items() if v}
+    nombres = {x['id'] for x in fh.get('actores', [])}
+    fh['actores'] = fh.get('actores', []) + [{'id': x[0], 'nombre': x[1], 'g': x[2]} for x in ACTORES if x[0] in celdas and x[0] not in nombres]
+    return fh
+
+
 def main():
     clas = leer(H / 'prensa-clas.json', {}); prensa = leer(H / 'prensa.json', {}); gac = leer(H / 'gacetas.json', {})
     celdas = collections.defaultdict(dict)
@@ -75,22 +111,7 @@ def main():
                 if p in ('a', 'm', 'r'):
                     c = celda(a, r); c['c'][p] += 1
                     c['ev'].append({'src': 'prensa', 'p': p, 't': it['t'], 'f': it['f'], 'u': it['url'], 'fecha': it['fecha']})
-    # 2026
-    voces = leer(LR / 'voces.json', []); votos = leer(LR / 'votos.json', {})
-    for v in voces:
-        a = VOZ26.get(v.get('k'))
-        if not a: continue
-        p, inf = (v['t'], True) if v['p'] == 'i' and v.get('t') else (v['p'], False)
-        if p == 'i': continue
-        c = celda(a, 'r2026'); c['c'][p] += 1; c['inferida'] = inf
-        c['ev'].append({'src': 'curada', 'p': p, 't': v['x'], 'f': v['f'], 'u': v.get('u', '')})
-    for b in votos.get('bloques', []):
-        a = b['id']
-        if a not in {x[0] for x in ACTORES}: continue
-        p = {'si': 'm' if 'ajust' in b.get('nota', '') else 'a', 'no': 'r'}.get(b['post']) or TIENDE.get(b.get('tiende'))
-        if not p: continue
-        c = celda(a, 'r2026'); c['c'][p] += 1; c['inferida'] = b['post'] == 'sin'
-        c['ev'].append({'src': 'curada', 'p': p, 't': b['nota'] + (' Inclinación: ' + b['por'] if b.get('por') else ''), 'f': 'Seguimiento de la Ley de Rescate'})
+    agrega_2026(celda, leer(LR / 'voces.json', []), leer(LR / 'votos.json', {}))
 
     out = {}
     for a, rs in celdas.items():
@@ -111,4 +132,10 @@ def main():
     print('actores', len(out), 'celdas', sum(len(v) for v in out.values()))
 
 if __name__ == '__main__':
-    main()
+    if '--solo-2026' in sys.argv:
+        fh = leer(LR / 'fuerzas-historicas.json', {})
+        refrescar_2026(fh, leer(LR / 'voces.json', []), leer(LR / 'votos.json', {}))
+        (LR / 'fuerzas-historicas.json').write_text(json.dumps(fh, ensure_ascii=False, indent=0))
+        print('2026 rehecho:', sum(1 for rs in fh['celdas'].values() if 'r2026' in rs), 'actores')
+    else:
+        main()

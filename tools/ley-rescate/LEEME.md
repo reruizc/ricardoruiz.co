@@ -95,6 +95,7 @@ Orden: `ollama serve` · `prensa.py` · `gacetas.py` (~25 min) · `clasificar.py
 - **La prensa en línea guarda poco antes de 2022** (3 a 7 titulares por reforma). GDELT no sirve: no acepta fechas
   antes de 2017 y responde 429. Las consultas amplias (actor + tributaria/IVA/impuestos) solo cuentan si el titular
   es de impuestos (`TEMA`).
+- ⚠ **La columna 2026 se rehace sola en cada corrida de `rastreo.py`** (`refrescar_2026`, desde voces.json y votos.json). Antes solo la escribía `build_historia.py`, y entre el 6 y el 12-nov se quedó con datos viejos (decía que Ocampo sería ponente). Las épocas anteriores siguen necesitando la corrida completa. A mano: `python3 tools/ley-rescate/historia/build_historia.py --solo-2026`.
 - `EXCLUIR` en `build_historia.py`: titulares que el modelo clasificó con postura y, revisados a mano, son de otro tema.
 - ⚠ `qwen3.8:27b-mlx` responde 501 con `format: json`: usar `qwen3.8:27b`.
 

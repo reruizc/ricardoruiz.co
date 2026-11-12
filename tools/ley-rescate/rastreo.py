@@ -531,6 +531,10 @@ def main():
     cfg = {'proyecto': leer(AQUI / 'proyecto.json', {}), 'hitos': leer(AQUI / 'hitos.json', []), 'voces': leer(AQUI / 'voces.json', []),
            'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {}), 'tributarias': leer(AQUI / 'tributarias.json', {}).get('lista', []),
            'analistas': leer(AQUI / 'analistas.json', {}).get('lista', []), 'historico': leer(AQUI / 'historico.json', {}), 'fuerzas_hist': leer(AQUI / 'fuerzas-historicas.json', {}), 'analisis': leer(AQUI / 'analisis.json', {}), 'verificaciones': leer(AQUI / 'verificaciones.json', {}).get('lista', [])}
+    # La columna 2026 de «las fuerzas de antes» se rehace aquí con las voces y los votos del día (ver historia/build_historia.py).
+    sys.path.insert(0, str(AQUI / 'historia'))
+    from build_historia import refrescar_2026
+    refrescar_2026(cfg['fuerzas_hist'], cfg['voces'], cfg['votos'])
     estado = calcular(corpus, clas, temas, tram, cfg, crudo)
     if llave and not o.solo_calcular:
         lect = lectura_llm(estado, llave)

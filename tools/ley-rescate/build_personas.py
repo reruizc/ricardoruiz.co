@@ -32,7 +32,7 @@ WIKI = {'José Manuel Restrepo': 'José Manuel Restrepo Abondano', 'Miguel Góme
         'María Fernanda Carrascal': 'María Fernanda Carrascal', 'Lisandro Junco': 'Lisandro Junco', 'Fabio Arias': 'Fabio Arias Giraldo',
         'Iván Cepeda': 'Iván Cepeda Castro', 'José Antonio Ocampo': 'José Antonio Ocampo', 'Alberto Carrasquilla': 'Alberto Carrasquilla Barrera',
         'Juan Camilo Restrepo': 'Juan Camilo Restrepo Salazar', 'Juan Daniel Oviedo': 'Juan Daniel Oviedo', 'Andrés Julián Rendón': 'Andrés Julián Rendón',
-        'Luis Carlos Reyes': 'Luis Carlos Reyes Hernández', 'María Claudia Lacouture': 'María Claudia Lacouture', 'Jennifer Pedraza': 'Jennifer Pedraza'}
+        'Luis Carlos Reyes': 'Luis Carlos Reyes Hernández', 'María Claudia Lacouture': 'María Claudia Lacouture', 'Jennifer Pedraza': 'Jennifer Pedraza', 'Alejandro Ordóñez': 'Alejandro Ordóñez'}
 BLOQUE = [('salvacion', 'sn'), ('centro democratico', 'cd'), ('conservador', 'con'), ('cambio radical', 'cr'), ('partido de la u', 'u'), ('liberal', 'lib'),
           ('alianza social independiente', 'asi'), ('verde', 'verde'), ('pacto historico', 'pacto'), ('pa-vida|uraba|paz es vida|asoambeima|consejo comunitario|mais|indigena', 'paz')]
 
