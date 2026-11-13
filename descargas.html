@@ -1735,6 +1735,23 @@
     populateSelect('sel-dept-gen', DEPTOS_GEN);
     renderCrudos();  // IIFE de auth corre antes (setea _userPlan/_isPremium)
     dlRefreshStatus().then(() => renderCrudos());  // saldo del mes desde el worker
+    // Enlace directo desde otras páginas: descargas.html?tab=crudos&cat=territoriales
+    // abre la pestaña y lleva a la tarjeta (las alcaldías mandan aquí para bajar por puesto y mesa).
+    (function(){
+      const q = new URLSearchParams(location.search);
+      const tab = q.get('tab'), cat = q.get('cat');
+      if (!tab || !document.getElementById('tab-' + tab)) return;
+      switchTab(document.querySelector(`.tab-btn[onclick*="'${tab}'"]`), tab);
+      if (!cat) return;
+      const ir = () => {
+        const card = document.getElementById('cat-' + cat);
+        if (!card) return;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.transition = 'box-shadow .4s'; card.style.boxShadow = '0 0 0 2px #0047FF';
+        setTimeout(() => { card.style.boxShadow = ''; }, 2600);
+      };
+      setTimeout(ir, 250); setTimeout(ir, 1500);   // la grilla se vuelve a pintar cuando llega el saldo del mes
+    })();
   </script>
   <script src="lang.js"></script>
 
