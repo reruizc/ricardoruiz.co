@@ -118,6 +118,7 @@
     .rt-sub{font-size:.62rem;letter-spacing:.06em;color:rgba(255,255,255,.4);margin:.25rem 0 0 1.25rem}
     .rt-votos{font-size:1.05rem;font-weight:400}
     .rt-pct{color:var(--green);font-size:.8rem}
+    .rt-gano{display:inline-block;font-size:.55rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#060810;background:var(--green);padding:.18rem .45rem;margin-left:.2rem;line-height:1.2;border-radius:2px;flex-shrink:0}
     .rt-esp .rt-name{color:rgba(255,255,255,.55);font-weight:400}
     .rt-esp .rt-votos{color:rgba(255,255,255,.55)}
     .rt-esp .rt-pct{color:rgba(255,255,255,.45)}
@@ -985,7 +986,8 @@
   function candsDeMuns(muns, soloMun = false){
     const out = [];
     for (const m of muns) for (const c of (m.top || [])){
-      out.push({ ...c, dep: m.dep, mun: m.mun, lugar: soloMun ? tCase(m.nombre_mun) : lugarMun(m), capital: m.es_capital });
+      const gano = !!(m.ganador && m.ganador.nombre === c.nombre && m.ganador.votos === c.votos);
+      out.push({ ...c, dep: m.dep, mun: m.mun, lugar: soloMun ? tCase(m.nombre_mun) : lugarMun(m), capital: m.es_capital, gano });
     }
     return out;
   }
@@ -1034,7 +1036,7 @@
       }
       const col = hashColor(r.nombre);
       const sub = [conLugar ? (r.lugar || '') + (r.capital ? ' ★' : '') : '', tCase(r.partido || '—')].filter(Boolean).join(' · ');
-      const marca = (ganador && primero) ? ' <span style="color:var(--green);font-size:.65rem;margin-left:.3rem">✦ ganó</span>' : '';
+      const marca = (r.gano || (ganador && primero)) ? '<span class="rt-gano">Ganó</span>' : '';
       primero = false;
       const click = (conLugar && r.dep) ? ` class="clk" onclick="goToMun('${r.dep}','${r.mun}')" title="Ver ${r.lugar || ''}"` : '';
       h += `<tr${click}><td class="rt-rank">${i+1}</td>
@@ -1453,17 +1455,17 @@
   function _doDownloadExcel(){
     if (!_lastTableData) return;
     const { title, conLugar, filas } = _lastTableData;
-    const headers = ['#', 'Candidato/a', 'Partido / movimiento', ...(conLugar ? ['Municipio'] : []), 'Votos', '%'];
+    const headers = ['#', 'Candidato/a', 'Partido / movimiento', ...(conLugar ? ['Municipio', '¿Ganó?'] : []), 'Votos', '%'];
     const rows = filas.map((r, i) => r.especial
-      ? { esp: true, c: [i+1, r.nombre, '', ...(conLugar ? [''] : []), r.votos, r.pct == null ? '' : r.pct.toFixed(1) + '%'] }
-      : { esp: false, c: [i+1, tCase(r.nombre), tCase(r.partido || ''), ...(conLugar ? [(r.lugar || '') + (r.capital ? ' (capital)' : '')] : []), r.votos, r.pct == null ? '' : r.pct.toFixed(1) + '%'] });
+      ? { esp: true, c: [i+1, r.nombre, '', ...(conLugar ? ['', ''] : []), r.votos, r.pct == null ? '' : r.pct.toFixed(1) + '%'] }
+      : { esp: false, g: !!r.gano, c: [i+1, tCase(r.nombre), tCase(r.partido || ''), ...(conLugar ? [(r.lugar || '') + (r.capital ? ' (capital)' : ''), r.gano ? 'Sí' : ''] : []), r.votos, r.pct == null ? '' : r.pct.toFixed(1) + '%'] });
     const nota = conLugar
       ? 'El % de cada candidato es sobre los votos válidos de su municipio; el de blanco, nulos y no marcados, sobre el total de votos del territorio.'
       : 'El % de cada candidato es sobre los votos válidos; el de blanco, nulos y no marcados, sobre el total de votos.';
     const iVotos = headers.indexOf('Votos');
     const th = headers.map(h => `<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #999;white-space:nowrap">${h}</th>`).join('');
-    const td = rows.map(({esp, c}) => `<tr>${c.map((v, ci) => {
-      const st = (esp ? 'color:#777;' : '') + (ci === 1 && !esp ? 'font-weight:bold;' : '');
+    const td = rows.map(({esp, g, c}) => `<tr>${c.map((v, ci) => {
+      const st = (esp ? 'color:#777;background:#f3f3f3;' : '') + (g ? 'background:#e6f6ec;' : '') + (ci === 1 && !esp ? 'font-weight:bold;' : '');
       const num = ci === iVotos ? ' x:num' : '';
       return `<td${num} style="${st}padding:5px 10px;border:1px solid #ddd">${_escX(v)}</td>`;
     }).join('')}</tr>`).join('');
