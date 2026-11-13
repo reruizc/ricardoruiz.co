@@ -154,6 +154,14 @@ def clonar_alcaldias(año):
     if año in (2011, 2015):
         s = rep(s, f'· censo electoral de {año} (Registraduría)</span>',
                    f'· sin el censo electoral de {año}: no se muestra la participación</span>')
+    if año == 2019:
+        # 2019 sí tiene sufragantes por edad y sexo (Edadygenero): «votaron» es dato, no estimación.
+        s = rep(s, "Votaron: estimación por inferencia ecológica. La Registraduría no publica quién votó en 2019 por edad y sexo; tomamos cuánto votó cada grupo en ese mismo puesto en 2019 (sufragantes mesa a mesa) y lo ajustamos a los votantes reales de 2019. Donde el puesto cambió entre elecciones se usa su zona o su municipio. Margen típico de ±2 a 4 puntos; en un puesto suelto, más.",
+                   "Votaron: sufragantes de 2019 por edad y sexo, mesa a mesa (Registraduría), llevados al total de votantes de la Alcaldía en cada puesto, porque ese registro no cubre todas las mesas.")
+        s = rep(s, "fmtN(s[10]) + ' · estimado'", "fmtN(s[10]) + ' · registrado'")
+        s = rep(s, "fila('Votaron', 'estimado', [s[7]", "fila('Votaron', 'registrado', [s[7]")
+    # 2011 y 2015: sin censo ni sufragantes por edad de esos años; el JSON de perfil
+    # no existe y la tarjeta no aparece.
     if '2023' in re.sub(r'<!--.*?-->|alcaldias-2023\.html|<a href="alcaldias-2023.html"[^<]*</a>', '', s):
         resto = sorted(set(re.findall(r'.{30}2023.{20}', s)))
         print('  ⚠ quedó «2023» (revisar):\n  ' + '\n  '.join(resto))
