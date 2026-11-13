@@ -13,9 +13,11 @@ puesto no es el mismo lugar de una elección a otra (Villavicencio conservaba un
 tercio de sus códigos entre 2019 y 2026), así que nombrarlo con el georef
 actual pondría votos en otro sitio sin que nada falle. Fuentes:
   2019 TER y JAL      censo 2019 (Registraduría, autoridades territoriales)
+  2023 TER y JAL      censo 2023 (TER se rehízo en nov-2026: la versión de jul-2026
+                      nombraba los puestos con el georef 2026 y 1.376 de 12.896
+                      códigos (10,6 %) daban OTRO lugar)
   2021 CLMJ (dic.)    Divipol 23-sep-2021
   2022 CONSU (mar.)   censo 2022
-  2023 JAL            censo 2023
   2025 ATIP Magdalena censo 2025 de esa misma elección
   2025 CLMJ (oct.)    censo 2026 (el más cercano: corte de enero de 2026)
   2011 TER, 2015 TER y 2016 PLEB: NO llevan DES_PP. No existe censo por puesto
@@ -24,7 +26,7 @@ Lo que el censo del año no nombra lleva el rótulo estructural de build.py
 (entre corchetes, derivado del código: nunca se confunde con un nombre real).
 
 Uso:
-  python3 tools/build-csv-names/build_historicos.py              # los 10
+  python3 tools/build-csv-names/build_historicos.py              # los 11
   python3 tools/build-csv-names/build_historicos.py GCS_2016PLEB # uno
 Entradas: el CSV de mesa de «FINAL SUBIDA GCS» y el _PUESTO.csv en
   Bases de datos/output_csv_names/historicos/orig/ (bajado de S3).
@@ -52,6 +54,7 @@ ARCHIVOS = {
     "GCS_2011TER":      (None, False),
     "GCS_2015TER":      (None, False),
     "GCS_2019TER":      ("censo:2019", False),
+    "GCS_2023TER":      ("censo:2023", False),
     "GCS_2019JAL":      ("censo:2019", True),
     "GCS_2021CLMJ":     ("divipol2021", True),
     "GCS_2022CONSU":    ("censo:2022", True),
