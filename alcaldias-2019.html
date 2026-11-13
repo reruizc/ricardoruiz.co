@@ -136,6 +136,8 @@
     .excel-btn-active:hover{background:#15803d}
     .excel-btn-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.35)}
     .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(74,222,128,.4);color:rgba(180,255,200,.9);font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+    body.no-copy .shell{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    body.no-copy input,body.no-copy select{-webkit-user-select:text;user-select:text}
     .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
     .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
     .dl-modal.show{display:flex}
@@ -529,6 +531,7 @@
     </footer>
   </div>
 
+  <div class="copy-toast" id="copy-toast">Esta tabla no se puede copiar. Para llevártela usa «Descargar este listado» (plan Pro) · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="copy-toast" id="pro-toast">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="dl-modal" id="dl-modal">
     <div class="dl-box">
@@ -1465,7 +1468,25 @@
   function updateExcelDownloadBtn(){
     const btn = document.getElementById('excel-download-btn');
     if (btn) btn.className = 'excel-btn ' + (_planDescarga() ? 'excel-btn-active' : 'excel-btn-locked');
+    document.body.classList.toggle('no-copy', !_planDescarga());
   }
+  // ─── Protección de copia (como senado-2026) ───
+  // Copiar la tabla sería un atajo a «Descargar este listado», así que solo copia quien puede descargar.
+  function showCopyToast(){
+    const now = Date.now();
+    if (showCopyToast._last && now - showCopyToast._last < 30000) return;
+    showCopyToast._last = now;
+    const t = document.getElementById('copy-toast');
+    t.classList.add('show'); clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+  }
+  ['copy', 'cut'].forEach(ev => document.addEventListener(ev, e => {
+    if (_planDescarga() || (e.target.closest && e.target.closest('input,select'))) return;
+    e.preventDefault(); showCopyToast();
+  }));
+  document.addEventListener('selectstart', e => {
+    if (_planDescarga() || (e.target.closest && e.target.closest('input,select,textarea'))) return;
+    e.preventDefault();
+  });
   function showProToast(){ const t = document.getElementById('pro-toast'); t.classList.add('show'); clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 4000); }
   function downloadExcelCurrentView(){
     if (!_planDescarga()){ showProToast(); return; }
