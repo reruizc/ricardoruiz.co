@@ -131,25 +131,35 @@ def clonar_resultados(corp, año):
 
 def clonar_alcaldias(año):
     s = fuente('alcaldias-2023.html')
-    # Todo «2023» de esta página es el año (título, ruta de datos, nombres de CSV);
+    # Todo «2023» de esta página es el año (título, ruta de datos, nombres de archivo);
     # el reemplazo global va PRIMERO para no comerse el texto que se agrega abajo.
     s = s.replace('2023', str(año))
-    s = s.replace(f"'29 Oct {año}'", f"'{FECHA[año][1]}'")
+    s = rep(s, f"'29 Oct {año}'", f"'{FECHA[año][1]}'", n=s.count(f"'29 Oct {año}'"))
+    # Fila «Año:» de la franja de datos: enlaza a los otros tres años y marca el actual.
+    años = []
+    for a in (2011, 2015, 2019, 2023):
+        años.append(f'<b>{a}</b>' if a == año else f'<a href="alcaldias-{a}.html" style="color:inherit">{a}</a>')
+    s, n = re.subn(r'<span class="meta-item">Año: .*?</span>\n',
+                   '<span class="meta-item">Año: ' + ' · '.join(años) + '</span>\n', s, count=1)
+    if n != 1:
+        raise SystemExit('alcaldías: no encontré la fila «Año:»')
     s = rep(s, f"const BASE = `${{S3}}/bases+de+datos/output_alcaldias_{año}`;",
                "const BASE = new URLSearchParams(location.search).has('local')\n"
                f"    ? 'Bases de datos/output_alcaldias_{año}'     // ?local=1 → verificación antes de subir\n"
                f"    : `${{S3}}/bases+de+datos/output_alcaldias_{año}`;")
-    s = rep(s, '''          académica ni un juicio político; es un mapa de lectura rápida.''',
-               f'''          académica ni un juicio político; es un mapa de lectura rápida.
-          <b style="color:var(--blue)">Ojo en {año}:</b> la curaduría manual de ganadores
-          se hizo para 2023 y la filiación del partido es la de 2022-2026, no la de {año}:
-          los ganadores de {año} por coalición quedan casi todos en "sin clasificar".''')
-    s = rep(s, '<span class="footer-brand">Datos: Registraduría</span>',
-               f'<span class="footer-brand">Datos: Registraduría (GCS {año}) · censo: Divipole actual, no el de {año}</span>')
+    # 2011 y 2015 no tienen censo de la época: la participación queda en «—» y se dice por qué.
+    for patron in ("setKPI(4, 'Participación', fmtPct(part), '');", "setKPI(3, 'Participación', fmtPct(part), '');"):
+        s = rep(s, patron, patron.replace("fmtPct(part), '')", f"fmtPct(part), part == null ? 'sin censo de {año}' : '')"),
+                n=s.count(patron))
+    if año in (2011, 2015):
+        s = rep(s, f'· censo electoral de {año} (Registraduría)</span>',
+                   f'· sin el censo electoral de {año}: no se muestra la participación</span>')
+    if '2023' in re.sub(r'<!--.*?-->|alcaldias-2023\.html|<a href="alcaldias-2023.html"[^<]*</a>', '', s):
+        resto = sorted(set(re.findall(r'.{30}2023.{20}', s)))
+        print('  ⚠ quedó «2023» (revisar):\n  ' + '\n  '.join(resto))
     out = os.path.join(RAIZ, f'alcaldias-{año}.html')
     open(out, 'w', encoding='utf-8').write(s)
     print('ok', os.path.basename(out))
-
 
 if __name__ == '__main__':
     año = int(sys.argv[1])
