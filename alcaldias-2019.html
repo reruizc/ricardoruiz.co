@@ -151,6 +151,31 @@
     .dl-btn-ok:hover{background:#0035cc}
     .dl-btn-cancel{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15)}
     .dl-btn-cancel:hover{background:rgba(255,255,255,.12);color:var(--white)}
+    /* Toggle Nacional/territorio · Resultados generales (como senado-2026) */
+    .circ-toggle{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .circ-btn{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.32rem .95rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.45);cursor:none;transition:all .15s}
+    .circ-btn:hover{border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.8)}
+    .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.95)}
+    .rg-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start}
+    .rg-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.8rem}
+    .rg-switch{display:flex;gap:.3rem}
+    .rg-sw{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .6rem;background:none;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.45);cursor:none}
+    .rg-sw.active{background:var(--blue);border-color:var(--blue);color:#fff}
+    #rg-tree{position:relative;height:440px;background:rgba(255,255,255,.02)}
+    .tm-cell{position:absolute;box-sizing:border-box;border:1px solid #060810;overflow:hidden;padding:.45rem .5rem;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);transition:filter .15s}
+    .tm-cell:hover{filter:brightness(1.15)}
+    .tm-pct{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-weight:800;font-size:1.25rem;letter-spacing:-.03em;line-height:1}
+    .tm-name{font-size:.7rem;font-weight:500;line-height:1.2;margin-top:.25rem}
+    .tm-sub{font-size:.58rem;letter-spacing:.04em;opacity:.85;margin-top:.2rem;line-height:1.35}
+    .tm-cell.chico .tm-name,.tm-cell.chico .tm-sub{display:none}
+    .tm-cell.chico .tm-pct{font-size:.8rem}
+    .tm-cell.mini .tm-pct{display:none}
+    .tm-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);text-align:center;padding:1rem}
+    #rg-map-slot #map-wrap{height:440px}
+    #rg-map-slot #hover-card{margin-top:.8rem!important}
+    .rg-more{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:#7ab3ff;background:none;border:1px solid rgba(0,71,255,.4);padding:.35rem .9rem;margin-top:.8rem;cursor:none}
+    @media(max-width:1100px){.rg-grid{grid-template-columns:1fr}}
+    @media(max-width:640px){.rg-votos{display:none}#rg-table th{white-space:normal;letter-spacing:.04em;font-size:.52rem}#rg-table .rt-sub{word-break:break-word}#rg-table .rt-gano{padding:.15rem .3rem}#rg-table .rt-name{font-size:.82rem!important}#rg-tree{height:340px}#rg-map-slot #map-wrap{height:340px}.tm-pct{font-size:1rem}}
     .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.4rem}
     .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
     .kpi-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
@@ -481,14 +506,49 @@
           </div>
         </div>
 
-        <div class="results-grid">
+        <div class="circ-toggle">
+          <button class="circ-btn circ-btn-active" id="tg-territorio" onclick="setModo('territorio')">Nacional</button>
+          <button class="circ-btn" id="tg-rg" onclick="setModo('rg')">Resultados generales</button>
+        </div>
+
+        <div id="panel-rg" style="display:none">
+          <div class="rg-grid">
+            <div class="card">
+              <div class="rg-head">
+                <div class="card-label" style="margin:0" id="rg-tree-label">Candidatos por partido · Nacional</div>
+                <div class="rg-switch">
+                  <button class="rg-sw active" data-tam="cand" onclick="setTamRG('cand')">Por candidatos</button>
+                  <button class="rg-sw" data-tam="gan" onclick="setTamRG('gan')">Por alcaldías ganadas</button>
+                </div>
+              </div>
+              <div id="rg-tree"></div>
+              <div class="rt-note" id="rg-tree-note"></div>
+            </div>
+            <div class="card">
+              <div class="card-label" style="margin-bottom:.6rem" id="rg-map-label">Mapa · partido ganador</div>
+              <div id="rg-map-slot"></div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:1.2rem">
+            <div class="table-header">
+              <div class="card-label" id="rg-table-label">Partidos y movimientos</div>
+              <div class="dl-group">
+                <button class="excel-btn excel-btn-locked js-excel" onclick="downloadExcelCurrentView()" title="Baja en Excel la lista que estás viendo">⬇ Descargar este listado</button>
+                <a class="mesa-btn" href="descargas.html?tab=crudos&cat=territoriales" title="Centro de descargas: resultados completos por puesto y por mesa">⬇ Descargar por puesto y mesa →</a>
+              </div>
+            </div>
+            <div id="rg-table"></div>
+          </div>
+        </div>
+
+        <div class="results-grid" id="main-grid">
           <!-- IZQUIERDA · datos generales primero, luego ranking territorial -->
           <div class="card" id="data-card" style="padding:1.2rem 1.3rem">
             <div class="table-header">
               <div class="card-label" id="table-label">Resultados nacionales</div>
               <span class="level-badge nacional" id="drill-badge">Nacional</span>
               <div class="dl-group">
-              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()" title="Baja en Excel la lista que estás viendo">⬇ Descargar este listado</button>
+              <button id="excel-download-btn" class="excel-btn excel-btn-locked js-excel" onclick="downloadExcelCurrentView()" title="Baja en Excel la lista que estás viendo">⬇ Descargar este listado</button>
               <a class="mesa-btn" href="descargas.html?tab=crudos&cat=territoriales" title="Centro de descargas: resultados completos por puesto y por mesa">⬇ Descargar por puesto y mesa →</a>
               </div>
             </div>
@@ -499,6 +559,7 @@
           <!-- DERECHA · panel compacto: mapa pequeño + donut + hover detail -->
           <div class="card" id="map-card" style="padding:1rem 1.1rem">
             <div class="card-label" id="map-label" style="margin-bottom:.6rem">Mapa nacional</div>
+            <div id="map-home"></div>
             <div id="map-wrap">
               <button id="map-back-btn" onclick="mapBack()">← Volver</button>
               <div id="alc-map"></div>
@@ -983,6 +1044,7 @@
       renderNacionalView();
     }
     updateMap();
+    if (modo === 'rg') renderRG();
   }
 
   // ─── Filtros en cascada: cada nivel aparece cuando el anterior tiene valor ───
@@ -992,6 +1054,18 @@
     document.getElementById('zon-filter').style.display = (currentMun && opciones('zon-select')) ? 'flex' : 'none';
     document.getElementById('pue-filter').style.display = (currentZon && opciones('pue-select')) ? 'flex' : 'none';
     document.getElementById('clear-btn').style.display = currentDep ? '' : 'none';
+    document.getElementById('tg-territorio').textContent = nombreTerritorio();
+  }
+  function nombreTerritorio(){
+    if (currentMun && currentDep){
+      const m = munsAll.find(x => x.dep === currentDep && x.mun === currentMun);
+      if (m) return tCase(m.nombre_mun);
+    }
+    if (currentDep){
+      const d = deptos.find(x => x.dep === currentDep);
+      if (d) return tCase(d.nombre);
+    }
+    return 'Nacional';
   }
 
   // ─── Nombres legibles ───
@@ -1136,6 +1210,192 @@
     document.getElementById('search-results').style.display = 'none';
     goToMun(dep, mun);
   }
+
+  // ─── Modo: territorio (tabla de más votados) · Resultados generales (partidos) ───
+  let modo = 'territorio', tamRG = 'cand', _rgToken = 0, _rgVerTodos = false;
+  function setModo(m){
+    if (m === modo) return;
+    modo = m;
+    document.getElementById('tg-territorio').classList.toggle('circ-btn-active', m === 'territorio');
+    document.getElementById('tg-rg').classList.toggle('circ-btn-active', m === 'rg');
+    document.getElementById('panel-rg').style.display = m === 'rg' ? '' : 'none';
+    document.getElementById('main-grid').style.display = m === 'rg' ? 'none' : '';
+    // El mapa (y su ficha de hover) se mudan al panel activo; en RG se pinta por partido ganador.
+    const wrap = document.getElementById('map-wrap'), hover = document.getElementById('hover-card');
+    if (m === 'rg'){
+      const slot = document.getElementById('rg-map-slot');
+      slot.appendChild(wrap); slot.appendChild(hover);
+    } else {
+      const home = document.getElementById('map-home');
+      home.after(wrap);
+      document.getElementById('donut-wrap').after(hover);
+    }
+    currentView = m === 'rg' ? 'partido' : 'candidato';
+    _rgVerTodos = false;
+    renderAll();
+    setTimeout(() => { if (alcMap){ alcMap.invalidateSize(); if (currentLayer && currentLayer.getBounds().isValid()) alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] }); } }, 0);
+  }
+  function setTamRG(t){
+    tamRG = t; _rgVerTodos = false;
+    document.querySelectorAll('.rg-sw').forEach(b => b.classList.toggle('active', b.dataset.tam === t));
+    renderRG();
+  }
+  const _domDepCache = {};
+  function partidoDominanteDep(dep){
+    if (dep in _domDepCache) return _domDepCache[dep];
+    const n = {};
+    for (const m of munsAll) if (m.dep === dep && m.ganador) n[m.ganador.partido] = (n[m.ganador.partido] || 0) + 1;
+    const top = Object.entries(n).sort((a,b) => b[1] - a[1])[0];
+    return (_domDepCache[dep] = top ? top[0] : null);
+  }
+
+  // Municipios (con TODOS sus candidatos) del territorio elegido. Zona y puesto no cambian
+  // el resultado: la alcaldía se decide en el municipio.
+  async function munsDelAlcance(){
+    if (currentDep){
+      const muns = await ensureDepLoaded(currentDep);
+      return currentMun ? muns.filter(m => m.mun === currentMun) : muns;
+    }
+    await cargarTodosLosCandidatos();
+    return deptos.flatMap(d => deptoCache[d.dep] || []);
+  }
+  // En cuántos municipios del país inscribió candidato cada partido. Con las listas completas
+  // cargadas es exacto; antes se aproxima con los 6 más votados de cada municipio.
+  let _munsPorPartido = null, _munsPorPartidoCompleto = false;
+  function munsPorPartido(){
+    if (_munsPorPartido && (_munsPorPartidoCompleto || !_todosCargados)) return _munsPorPartido;
+    const n = new Map();
+    if (_todosCargados){
+      for (const d of deptos) for (const m of (deptoCache[d.dep] || [])){
+        for (const k of new Set((m.candidatos || []).map(c => (c.partido || '').replace(/\s+/g, ' ').trim()))) n.set(k, (n.get(k) || 0) + 1);
+      }
+      _munsPorPartidoCompleto = true;
+    } else {
+      for (const m of munsAll) for (const k of new Set((m.top || []).map(c => (c.partido || '').replace(/\s+/g, ' ').trim()))) n.set(k, (n.get(k) || 0) + 1);
+    }
+    return (_munsPorPartido = n);
+  }
+  const LOCAL = 'Coaliciones y movimientos locales';
+  function agregarPartidos(muns){
+    const agg = new Map();
+    let nCand = 0;
+    // Con más de un municipio en pantalla, los movimientos que solo inscribieron candidato en
+    // UN municipio del país se agrupan: son más de 1.600 nombres distintos y, sueltos, no se leen.
+    const agrupar = muns.length > 1, mpp = munsPorPartido();
+    for (const m of muns){
+      const cs = m.candidatos || [];
+      if (!cs.length) continue;
+      const gan = cs.reduce((a, b) => (b.votos > a.votos ? b : a), cs[0]);
+      for (const c of cs){
+        const nom = (c.partido || 'Sin partido').replace(/\s+/g, ' ').trim();
+        const esLocal = agrupar && (mpp.get(nom) || 1) <= 1 && !PARTY_COLORS[nom];
+        const k = esLocal ? LOCAL : nom;
+        const r = agg.get(k) || { partido: k, cand: 0, gan: 0, votos: 0, local: esLocal, nombres: new Set() };
+        r.nombres.add(nom);
+        r.cand += 1; r.votos += c.votos || 0;
+        if (c === gan) r.gan += 1;
+        agg.set(k, r);
+        nCand += 1;
+      }
+    }
+    return { partidos: [...agg.values()], nCand, nMun: muns.filter(m => (m.candidatos || []).length).length };
+  }
+  function squarify(items, W, H){
+    const out = [];
+    const total = items.reduce((s, i) => s + i.v, 0);
+    if (!total) return out;
+    let x = 0, y = 0, w = W, h = H;
+    const rest = items.map(i => ({ ...i, a: i.v * W * H / total }));
+    let row = [];
+    const worst = (r, len) => {
+      const s = r.reduce((t, i) => t + i.a, 0), mx = Math.max(...r.map(i => i.a)), mn = Math.min(...r.map(i => i.a));
+      return Math.max(len * len * mx / (s * s), (s * s) / (len * len * mn));
+    };
+    const layout = r => {
+      const s = r.reduce((t, i) => t + i.a, 0);
+      if (w >= h){ const cw = s / h; let cy = y; for (const i of r){ const rh = i.a / cw; out.push({ ...i, x, y: cy, w: cw, h: rh }); cy += rh; } x += cw; w -= cw; }
+      else { const rh = s / w; let cx = x; for (const i of r){ const rw = i.a / rh; out.push({ ...i, x: cx, y, w: rw, h: rh }); cx += rw; } y += rh; h -= rh; }
+    };
+    while (rest.length){
+      const len = Math.min(w, h), it = rest[0];
+      if (!row.length || worst(row.concat(it), len) <= worst(row, len)){ row.push(it); rest.shift(); }
+      else { layout(row); row = []; }
+    }
+    if (row.length) layout(row);
+    return out;
+  }
+  let _rgUltimo = null;
+  function pintarTreemap(){
+    const box = document.getElementById('rg-tree');
+    if (!_rgUltimo || !box.clientWidth) return;
+    const { partidos, nCand, nMun } = _rgUltimo;
+    const met = tamRG === 'gan' ? 'gan' : 'cand';
+    const total = met === 'gan' ? nMun : nCand;
+    const orden = partidos.filter(p => p[met] > 0).sort((a,b) => b[met] - a[met] || b.votos - a.votos);
+    const MAX = 14;
+    let items = orden.slice(0, MAX).map(p => ({ ...p, v: p[met] }));
+    const resto = orden.slice(MAX).filter(p => !p.local);
+    const loc = orden.slice(MAX).find(p => p.local);
+    if (loc) items.push({ ...loc, v: loc[met] });
+    if (resto.length){
+      items.push({ otros: true, partido: `Otros ${fmtN(resto.length)} partidos y movimientos`, cand: resto.reduce((s,p)=>s+p.cand,0), gan: resto.reduce((s,p)=>s+p.gan,0), v: resto.reduce((s,p)=>s+p[met],0) });
+    }
+    const W = box.clientWidth, H = box.clientHeight;
+    const rects = squarify(items, W, H);
+    box.innerHTML = rects.map(r => {
+      const pct = total ? r.v / total * 100 : 0;
+      const col = r.otros ? '#3b4256' : r.local ? '#6b5a3e' : colorForPartido(r.partido);
+      const cls = (r.w < 70 || r.h < 46) ? ((r.w < 34 || r.h < 22) ? ' chico mini' : ' chico') : '';
+      const sub = `${fmtN(r.cand)} candidato${r.cand === 1 ? '' : 's'} · ${r.gan === 1 && r.cand === 1 ? 'ganó' : fmtN(r.gan) + (r.gan === 1 ? ' ganó' : ' ganaron')}`;
+      const nomR = (r.otros || r.local) ? r.partido + (r.local ? ` (${fmtN(r.nombres.size)})` : '') : tCase(r.partido);
+      const tip = `${nomR} — ${pct.toFixed(1)}% · ${sub}`;
+      return `<div class="tm-cell${cls}" title="${tip.replace(/"/g,'&quot;')}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${col}">
+        <div class="tm-pct">${pct.toFixed(pct < 10 ? 1 : 0)}%</div>
+        <div class="tm-name">${nomR}</div>
+        <div class="tm-sub">${sub}</div></div>`;
+    }).join('');
+  }
+  async function renderRG(){
+    const tok = ++_rgToken;
+    const nombre = nombreTerritorio();
+    const met = tamRG === 'gan' ? 'gan' : 'cand';
+    document.getElementById('rg-tree-label').textContent = (met === 'gan' ? 'Alcaldías ganadas por partido · ' : 'Candidatos por partido · ') + nombre;
+    document.getElementById('rg-map-label').textContent = `Mapa · partido ganador · ${nombre}`;
+    document.getElementById('rg-table-label').textContent = `Partidos y movimientos · ${nombre}`;
+    const box = document.getElementById('rg-tree');
+    if (!currentDep && !_todosCargados) box.innerHTML = '<div class="tm-load">Cargando las listas de candidatos de todo el país…</div>';
+    const muns = await munsDelAlcance();
+    if (tok !== _rgToken) return;
+    _rgUltimo = agregarPartidos(muns);
+    const { partidos, nCand, nMun } = _rgUltimo;
+    pintarTreemap();
+    document.getElementById('rg-tree-note').textContent = met === 'gan'
+      ? `El rectángulo completo son las ${fmtN(nMun)} alcaldías ${nMun === 1 ? 'del municipio' : 'del territorio'}; cada bloque, las que ganó ese partido o movimiento. «${LOCAL}» junta a los que solo inscribieron candidato en un municipio del país.`
+      : `El rectángulo completo son los ${fmtN(nCand)} candidatos a alcaldía ${currentMun ? 'del municipio' : 'del territorio'} (${fmtN(nMun)} municipio${nMun === 1 ? '' : 's'}); cada bloque, los que inscribió ese partido o movimiento. «${LOCAL}» junta a los que solo inscribieron candidato en un municipio del país.`;
+
+    // Tabla de partidos
+    const orden = [...partidos].sort((a,b) => b[met] - a[met] || b.votos - a.votos);
+    const totVotos = partidos.reduce((s,p) => s + p.votos, 0);
+    _lastTableData = { tipo: 'partidos', title: `Partidos y movimientos · Alcaldías 2019 · ${nombre}`, filas: orden, nCand, nMun, totVotos };
+    const ver = _rgVerTodos ? orden : orden.slice(0, 25);
+    const maxV = orden.length ? orden[0][met] || 1 : 1;
+    let h = `<table class="results-table"><thead><tr><th>#</th><th>Partido / movimiento</th><th class="r">Candidatos</th><th class="r">Ganaron</th><th class="r rg-votos">Votos</th><th class="r" style="min-width:110px">%</th></tr></thead><tbody>`;
+    ver.forEach((p, i) => {
+      const col = p.local ? '#6b5a3e' : colorForPartido(p.partido);
+      const pct = met === 'gan' ? (nMun ? p.gan / nMun * 100 : 0) : (nCand ? p.cand / nCand * 100 : 0);
+      h += `<tr><td class="rt-rank">${i+1}</td>
+        <td><div class="rt-name" style="font-size:.95rem"><span class="rt-dot" style="background:${col}"></span>${p.local ? p.partido : tCase(p.partido)}</div>${p.local ? `<div class="rt-sub">${fmtN(p.nombres.size)} nombres distintos que solo inscribieron candidato en un municipio</div>` : ''}</td>
+        <td class="r rt-votos">${fmtN(p.cand)}</td>
+        <td class="r rt-votos">${p.gan ? `<span class="rt-gano" style="margin:0">${fmtN(p.gan)}</span>` : '<span style="color:rgba(255,255,255,.3)">0</span>'}</td>
+        <td class="r rg-votos">${fmtN(p.votos)}</td>
+        <td class="r"><span class="rt-pct">${pct.toFixed(1)}%</span><div class="bar-wrap"><div class="bar-fill" style="width:${(p[met]/maxV*100).toFixed(1)}%;background:${col}"></div></div></td></tr>`;
+    });
+    h += '</tbody></table>';
+    if (orden.length > 25) h += `<button class="rg-more" onclick="_rgVerTodos=!_rgVerTodos;renderRG()">${_rgVerTodos ? 'Ver solo los primeros 25' : `Ver los ${fmtN(orden.length)} partidos y movimientos`}</button>`;
+    h += `<div class="rt-note">El % es sobre ${met === 'gan' ? `las ${fmtN(nMun)} alcaldías` : `los ${fmtN(nCand)} candidatos`} del territorio. «Ganaron»: alcaldías que ganó el partido o movimiento. «${LOCAL}»: los que solo inscribieron candidato en un municipio del país.</div>`;
+    document.getElementById('rg-table').innerHTML = h;
+  }
+  window.addEventListener('resize', () => { if (modo === 'rg') pintarTreemap(); });
 
   // ─── Vista NACIONAL ────────
   function renderNacionalView(){
@@ -1466,8 +1726,7 @@
     return !!(token && user && ['pro','premium','full'].includes(user.plan));
   }
   function updateExcelDownloadBtn(){
-    const btn = document.getElementById('excel-download-btn');
-    if (btn) btn.className = 'excel-btn ' + (_planDescarga() ? 'excel-btn-active' : 'excel-btn-locked');
+    document.querySelectorAll('.js-excel').forEach(btn => { btn.className = 'excel-btn js-excel ' + (_planDescarga() ? 'excel-btn-active' : 'excel-btn-locked'); });
     document.body.classList.toggle('no-copy', !_planDescarga());
   }
   // ─── Protección de copia (como senado-2026) ───
@@ -1503,6 +1762,7 @@
   function _escX(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function _doDownloadExcel(){
     if (!_lastTableData) return;
+    if (_lastTableData.tipo === 'partidos') return _doDownloadExcelPartidos();
     const { title, conLugar, filas } = _lastTableData;
     const headers = ['#', 'Candidato/a', 'Partido / movimiento', ...(conLugar ? ['Municipio', '¿Ganó?'] : []), 'Votos', '%'];
     const rows = filas.map((r, i) => r.especial
@@ -1525,6 +1785,24 @@
     a.href = url;
     const slug = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[·\s]+/g, '-').replace(/[^\w\-]/g, '').replace(/-+/g, '-');
     a.download = (slug.includes('alcaldias-2019') ? slug : 'alcaldias-2019-' + slug) + '.xls';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  }
+  function _doDownloadExcelPartidos(){
+    const { title, filas, nCand, nMun } = _lastTableData;
+    const headers = ['#', 'Partido / movimiento', 'Candidatos', '% de los candidatos', 'Alcaldías ganadas', '% de las alcaldías', 'Votos'];
+    const th = headers.map(h => `<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #999;white-space:nowrap">${h}</th>`).join('');
+    const td = filas.map((p, i) => {
+      const c = [i+1, p.local ? `${p.partido} (${p.nombres.size} nombres)` : tCase(p.partido), p.cand, (nCand ? p.cand / nCand * 100 : 0).toFixed(1) + '%', p.gan, (nMun ? p.gan / nMun * 100 : 0).toFixed(1) + '%', p.votos];
+      return `<tr>${c.map((v, ci) => `<td${[2,4,6].includes(ci) ? ' x:num' : ''} style="${p.gan ? 'background:#e6f6ec;' : ''}${ci === 1 ? 'font-weight:bold;' : ''}padding:5px 10px;border:1px solid #ddd">${_escX(v)}</td>`).join('')}</tr>`;
+    }).join('');
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><h3 style="font-family:Arial;margin-bottom:4px">${_escX(title)}</h3><p style="font-family:Arial;font-size:11px;color:#666;margin:0 0 8px">${fmtN(nCand)} candidatos en ${fmtN(nMun)} municipios. Fuente: Registraduría (GCS 2019) · ricardoruiz.co</p><table border="1" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:12px"><thead><tr>${th}</tr></thead><tbody>${td}</tbody></table></body></html>`;
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const slug = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[·\s]+/g, '-').replace(/[^\w\-]/g, '').replace(/-+/g, '-');
+    a.download = slug + '.xls';
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
   }
@@ -1584,7 +1862,7 @@
 
   // ─── Mapa Leaflet ─────────────
   async function initMap(){
-    alcMap = L.map('alc-map', { zoomControl: true, attributionControl: false, preferCanvas: false, scrollWheelZoom: true }).setView([4.5, -73.5], 6);
+    alcMap = L.map('alc-map', { zoomControl: true, attributionControl: false, preferCanvas: false, scrollWheelZoom: true, zoomSnap: 0.25 }).setView([4.5, -73.5], 6);
     depGeoRaw = await fetch(DEP_GEO_URL).then(r => r.json());
     // ResizeObserver: si el container cambia de tamaño (preview iframe, resize de
     // ventana, mostrar/ocultar panel), invalidamos size y reajustamos bounds.
@@ -1644,7 +1922,7 @@
             const top = topDep(d.dep);
             if (top) fill = colorForBloque(top);
           } else if (currentView === 'partido'){
-            const dominant = d.partidos && d.partidos[0] ? d.partidos[0].partido : null;
+            const dominant = partidoDominanteDep(d.dep);
             if (dominant) fill = colorForPartido(dominant);
           } else {
             const top = topDep(d.dep);
