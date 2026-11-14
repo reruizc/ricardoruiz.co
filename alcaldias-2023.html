@@ -482,7 +482,7 @@
             </select>
           </div>
           <div class="f-group" id="zon-filter" style="display:none">
-            <span class="sub-label">Zona:</span>
+            <span class="sub-label" id="zon-label">Zona:</span>
             <select id="zon-select" class="dep-select" onchange="onZonChange(this.value)">
               <option value="">TODAS</option>
             </select>
@@ -762,7 +762,6 @@
     'MOVIMIENTO ALIANZA DEMOCRATICA AMPLIA': 'izq',
     // centro-izquierda
     'PARTIDO ALIANZA VERDE': 'ci',
-    'PARTIDO NUEVO LIBERALISMO': 'ci',
     'PARTIDO VERDE OXIGENO': 'ci',
     'AGRUPACION POLITICA EN MARCHA': 'ci',
     'PARTIDO COLOMBIA RENACIENTE': 'ci',
@@ -779,6 +778,7 @@
     'PARTIDO CAMBIO RADICAL': 'cd',
     'PARTIDO CONSERVADOR COLOMBIANO': 'cd',
     'PARTIDO LIGA GOBERNANTES ANTICORRUPCION - LIGA': 'cd',
+    'PARTIDO NUEVO LIBERALISMO': 'cd',          // centro-derecha (decisión de Ricardo, nov-2026)
     'MOVIMIENTO SALVACION NACIONAL': 'd',
     'MOVIMIENTO  SALVACION NACIONAL': 'd',
     // derecha
@@ -807,13 +807,10 @@
     // izquierda
     ['KRASNOV', 'izq'],                     // Tunja
     // centro-izquierda
-    ['CARLOS FERNANDO GALAN', 'ci'],        // Bogotá (Nuevo Liberalismo)
     ['ALVARO ALEJANDRO EDER', 'ci'],        // Cali (Revivamos Cali)
     ['JOHANA XIMENA ARANDA', 'ci'],         // Ibagué (Ibagué Para Todos · apoyo Pacto)
-    ['MARLON MONSALVE', 'ci'],              // Florencia (Nuevo Liberalismo + En Marcha)
     ['RAFAEL ANDRES BOLANOS', 'ci'],        // Quibdó (Alianza Verde)
     ['JAIME ARIEL RODRIGUEZ', 'ci'],        // Puerto Carreño (Alianza Verde)
-    ['WILLY ALEJANDRO RODRIGUEZ', 'ci'],    // San José Guaviare (Nuevo Liberalismo)
     ['ELQUIN JADRIAN UNI', 'ci'],           // Leticia (Colombia Renaciente)
     ['MARCO ALIRIO PORRAS', 'ci'],          // Mitú (ASI indígena)
     // centro
@@ -827,7 +824,10 @@
     ['ARTURO ALEXANDER SANCHEZ', 'c'],      // Inírida (Una Nueva Historia)
     ['ERNESTO MIGUEL OROZCO', 'c'],         // Valledupar (Arreglemos Esto)
     ['GENARO DAVID REDONDO', 'c'],          // Riohacha (Genaro)
-    // centro-derecha
+    // centro-derecha · Nuevo Liberalismo va entero aquí
+    ['CARLOS FERNANDO GALAN', 'cd'],        // Bogotá (Nuevo Liberalismo)
+    ['MARLON MONSALVE', 'cd'],              // Florencia (Nuevo Liberalismo + En Marcha)
+    ['WILLY ALEJANDRO RODRIGUEZ', 'cd'],    // San José Guaviare (Nuevo Liberalismo)
     ['DUMEK JOSE TURBAY', 'cd'],            // Cartagena (Unidos para Avanzar · Conservadores)
     ['JORGE ENRIQUE ACEVEDO', 'cd'],        // Cúcuta (Todos por Cúcuta)
     ['ALEXANDER BAQUERO', 'cd'],            // Villavicencio (Recuperemos Villavo)
@@ -848,7 +848,9 @@
       if (name.includes(pat)) return bl;
     }
     const part = (g.partido || '').toString().trim();
-    return PARTIDO_BLOQUE[part] || 'sc';
+    if (PARTIDO_BLOQUE[part]) return PARTIDO_BLOQUE[part];
+    if (/NUEVO LIBERALISMO/.test(norm(part))) return 'cd';
+    return 'sc';
   }
   function colorForBloque(g){
     return BLOQUE_COLOR[bloqueForCandidato(g)] || BLOQUE_COLOR.sc;
@@ -977,7 +979,44 @@
     }
     munSel.disabled = false;
     document.getElementById('clear-btn').style.display = '';
+    // Bogotá es un solo municipio: se entra directo a la ciudad y sus localidades.
+    if (dep === '16' && sorted.length === 1){ munSel.value = sorted[0].mun; return onMunChange(sorted[0].mun); }
     renderAll();
+  }
+
+  // ─── Unidad bajo el municipio ───
+  // Bogotá: la zona electoral ES la localidad (01-20). Medellín: dos zonas forman una
+  // comuna (mapeo estable 2015-2026, ver tools/build-medellin-historicos.js). Resto: zona.
+  // En todo el país la 90 es el puesto censo y la 98 las cárceles.
+  const BOG_LOC = { '01':'Usaquén','02':'Chapinero','03':'Santa Fe','04':'San Cristóbal','05':'Usme','06':'Tunjuelito','07':'Bosa','08':'Kennedy','09':'Fontibón','10':'Engativá','11':'Suba','12':'Barrios Unidos','13':'Teusaquillo','14':'Los Mártires','15':'Antonio Nariño','16':'Puente Aranda','17':'La Candelaria','18':'Rafael Uribe Uribe','19':'Ciudad Bolívar','20':'Sumapaz','90':'Corferias (puesto censo)','98':'Cárceles' };
+  const MDE_COM = { '01':'Popular','02':'Santa Cruz','03':'Manrique','04':'Aranjuez','05':'Castilla','06':'Doce de Octubre','07':'Robledo','08':'Villa Hermosa','09':'Buenos Aires','10':'La Candelaria','11':'Laureles Estadio','12':'La América','13':'San Javier','14':'El Poblado','15':'Guayabal','16':'Belén','99':'Corregimientos','90':'Puesto censo','98':'Cárceles' };
+  const MDE_Z2C = { '01':'01','02':'01','03':'02','04':'02','05':'03','06':'03','07':'04','08':'04','09':'05','10':'05','11':'06','12':'06','13':'07','14':'07','15':'08','16':'08','17':'09','18':'09','19':'10','20':'10','21':'11','22':'11','23':'12','24':'12','25':'13','26':'13','27':'14','28':'14','29':'15','30':'16','31':'16','32':'16','99':'99','90':'90','98':'98' };
+  function tipoUnidad(dep = currentDep, mun = currentMun){
+    if (dep === '16' && mun === '001') return 'loc';
+    if (dep === '01' && mun === '001') return 'com';
+    return 'zona';
+  }
+  function unidadDe(zz, dep = currentDep, mun = currentMun){
+    return tipoUnidad(dep, mun) === 'com' ? (MDE_Z2C[zz] || zz) : zz;
+  }
+  function rotuloUnidad(plural){
+    const t = tipoUnidad();
+    if (t === 'loc') return plural ? 'Localidades' : 'Localidad';
+    if (t === 'com') return plural ? 'Comunas' : 'Comuna';
+    return plural ? 'Zonas' : 'Zona';
+  }
+  function nombreUnidad(u, dep = currentDep, mun = currentMun){
+    const t = tipoUnidad(dep, mun);
+    if (t === 'loc') return BOG_LOC[u] || ('Zona ' + u);
+    if (t === 'com') return MDE_COM[u] ? (/^\d+$/.test(u) && +u <= 16 ? `Comuna ${+u} · ${MDE_COM[u]}` : MDE_COM[u]) : ('Zona ' + u);
+    if (u === '90') return 'Zona 90 · puesto censo';
+    if (u === '98') return 'Zona 98 · cárceles';
+    return 'Zona ' + u;
+  }
+  function pueDe(p){ return p.zz + '-' + p.pp; }
+  function rotuloPuesto(pid){
+    const [zz, pp] = String(pid || '').split('-');
+    return tipoUnidad() === 'com' ? `Puesto ${pp} (zona ${zz})` : `Puesto ${pp}`;
   }
   async function onMunChange(mun){
     currentMun = mun;
@@ -988,11 +1027,12 @@
       // Poblar zonas disponibles para este mun
       try {
         const puestos = await ensurePuestosLoaded(currentDep);
-        const zonas = [...new Set(puestos.filter(p => p.mun === mun).map(p => p.zz))].sort();
+        const zonas = [...new Set(puestos.filter(p => p.mun === mun).map(p => unidadDe(p.zz)))].sort();
         const zonSel = document.getElementById('zon-select');
+        zonSel.options[0].textContent = tipoUnidad() === 'zona' ? 'TODAS' : 'TODA LA CIUDAD';
         for (const z of zonas){
           const o = document.createElement('option');
-          o.value = z; o.textContent = 'Zona ' + z;
+          o.value = z; o.textContent = nombreUnidad(z);
           zonSel.appendChild(o);
         }
         zonSel.disabled = zonas.length === 0;
@@ -1008,11 +1048,11 @@
     pueSel.disabled = true;
     if (zon && currentDep && currentMun){
       const puestos = await ensurePuestosLoaded(currentDep);
-      const pps = puestos.filter(p => p.mun === currentMun && p.zz === zon)
-                         .map(p => p.pp).sort();
-      for (const pp of pps){
+      const pps = puestos.filter(p => p.mun === currentMun && unidadDe(p.zz) === zon)
+                         .map(pueDe).sort();
+      for (const pid of pps){
         const o = document.createElement('option');
-        o.value = pp; o.textContent = 'Puesto ' + pp;
+        o.value = pid; o.textContent = rotuloPuesto(pid);
         pueSel.appendChild(o);
       }
       pueSel.disabled = pps.length === 0;
@@ -1047,13 +1087,13 @@
     renderDrillNav();
     if (currentPue && currentZon && currentMun && currentDep){
       const puestos = await ensurePuestosLoaded(currentDep);
-      const p = puestos.find(x => x.mun === currentMun && x.zz === currentZon && x.pp === currentPue);
+      const p = puestos.find(x => x.mun === currentMun && pueDe(x) === currentPue);
       const muns = await ensureDepLoaded(currentDep);
       const m = muns.find(x => x.mun === currentMun);
       renderPuestoView(p, m);
     } else if (currentZon && currentMun && currentDep){
       const puestos = await ensurePuestosLoaded(currentDep);
-      const ppsZona = puestos.filter(x => x.mun === currentMun && x.zz === currentZon);
+      const ppsZona = puestos.filter(x => x.mun === currentMun && unidadDe(x.zz) === currentZon);
       const muns = await ensureDepLoaded(currentDep);
       const m = muns.find(x => x.mun === currentMun);
       renderZonaView(ppsZona, m);
@@ -1078,6 +1118,7 @@
     document.getElementById('mun-filter').style.display = currentDep ? 'flex' : 'none';
     document.getElementById('zon-filter').style.display = (currentMun && opciones('zon-select')) ? 'flex' : 'none';
     document.getElementById('pue-filter').style.display = (currentZon && opciones('pue-select')) ? 'flex' : 'none';
+    document.getElementById('zon-label').textContent = rotuloUnidad() + ':';
     document.getElementById('clear-btn').style.display = currentDep ? '' : 'none';
     document.getElementById('tg-territorio').textContent = nombreTerritorio();
   }
@@ -1479,27 +1520,29 @@
     setKPI(4, 'Ganador', win ? win.nombre.split(' ').slice(0,2).join(' ') : '—', win ? fmtPct(win.pct) : '');
     document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
     document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
-    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · Zona ${currentZon}`, '', fmtN(sumVV));
-    setMapLabel(`${mMeta ? mMeta.nombre : ''} · Zona ${currentZon}`);
-    setTableLabel(`Más votados · ${mMeta ? tCase(mMeta.nombre) : ''} · Zona ${currentZon}`);
+    const nomU = nombreUnidad(currentZon);
+    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · ${nomU}`, '', fmtN(sumVV));
+    setMapLabel(`${mMeta ? tCase(mMeta.nombre) : ''} · ${nomU}`);
+    setTableLabel(`Más votados · ${mMeta ? tCase(mMeta.nombre) : ''} · ${nomU}`);
     drawDonut({ votos_totales: sumVT, votos_validos: sumVV, censo: 0, especiales: {} });
 
     // Candidatos sumados en la zona + lista de puestos para bajar de nivel
     const espZ = { blanco: 0, nulos: 0, no_marcados: 0 };
     for (const p of pps) for (const k in espZ) espZ[k] += (p.especiales || {})[k] || 0;
     const filasZ = sumarCandsPuestos(pps, sumVV).concat(filasEspeciales(espZ, sumVT));
-    let html = renderTopTable(filasZ, { ambito: 'de la zona', nota: 'Por puesto, el archivo trae los seis candidatos más votados: en la suma de la zona puede faltar algún candidato pequeño.' });
-    html += `<div class="card-label sec-label">Puestos de la zona</div><div class="mun-detail">
-      <div class="mun-detail-title">${mMeta ? mMeta.nombre : ''} · Zona ${currentZon}</div>
+    const uSing = rotuloUnidad().toLowerCase();
+    let html = renderTopTable(filasZ, { ambito: 'de la ' + uSing, nota: `Por puesto, el archivo trae los seis candidatos más votados: en la suma de la ${uSing} puede faltar algún candidato pequeño.` });
+    html += `<div class="card-label sec-label">Puestos de la ${uSing}</div><div class="mun-detail">
+      <div class="mun-detail-title">${mMeta ? tCase(mMeta.nombre) : ''} · ${nomU}</div>
       <div class="mun-detail-sub">${deptoName} · ${pps.length} puestos</div>
       <table class="ranking-table"><thead><tr><th>Puesto</th><th>Ganador</th><th class="r">Votos</th><th class="r">%</th></tr></thead><tbody>`;
-    const sorted = [...pps].sort((a,b) => a.pp.localeCompare(b.pp));
+    const sorted = [...pps].sort((a,b) => pueDe(a).localeCompare(pueDe(b)));
     for (const p of sorted){
       const g = (p.top && p.top[0]) || null;
       const col = g ? colorForRow(g) : 'transparent';
       const onClick = `goToPuesto('${p.zz}','${p.pp}')`;
       html += `<tr style="cursor:pointer" onclick="${onClick}">
-        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>Puesto ${p.pp}</div>
+        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${rotuloPuesto(pueDe(p))}</div>
           <div class="row-sub">${fmtN(p.votos_validos)} válidos</div></td>
         <td>${g ? `<div class="cand-name" style="font-size:.72rem">${g.nombre.split(' ').slice(0,3).join(' ')}</div>
           <div class="cand-party" style="font-size:.56rem">${(g.partido || '—').slice(0,28)}</div>` : '—'}</td>
@@ -1522,9 +1565,10 @@
     setKPI(4, 'Ganador', g ? g.nombre.split(' ').slice(0,2).join(' ') : '—', g ? fmtPct(g.pct) : '');
     document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
     document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
-    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · Zona ${p.zz} · Puesto ${p.pp}`, '', fmtN(p.votos_validos));
-    setMapLabel(`Puesto ${p.pp} · Zona ${p.zz}`);
-    setTableLabel(`Más votados · ${mMeta ? tCase(mMeta.nombre) : ''} · Zona ${p.zz} · Puesto ${p.pp}`);
+    const nomUP = nombreUnidad(unidadDe(p.zz));
+    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · ${nomUP} · Puesto ${p.pp}`, '', fmtN(p.votos_validos));
+    setMapLabel(`${nomUP} · ${rotuloPuesto(pueDe(p))}`);
+    setTableLabel(`Más votados · ${mMeta ? tCase(mMeta.nombre) : ''} · ${nomUP} · ${rotuloPuesto(pueDe(p))}`);
     drawDonut({ votos_totales: p.votos_totales, votos_validos: p.votos_validos, censo: 0, especiales: p.especiales || {} });
 
     const filasP = (p.top || []).map(c => ({ ...c })).concat(filasEspeciales(p.especiales || {}, p.votos_totales));
@@ -1551,10 +1595,11 @@
   }
 
   function goToPuesto(zz, pp){
-    document.getElementById('zon-select').value = zz;
-    onZonChange(zz).then(() => {
-      document.getElementById('pue-select').value = pp;
-      onPueChange(pp);
+    const u = unidadDe(zz);
+    document.getElementById('zon-select').value = u;
+    onZonChange(u).then(() => {
+      document.getElementById('pue-select').value = zz + '-' + pp;
+      onPueChange(zz + '-' + pp);
     });
   }
 
@@ -1685,7 +1730,7 @@
     const b = document.getElementById('drill-badge');
     const lvl = currentLevel();
     b.className = 'level-badge ' + lvl;
-    const labels = { nacional:'Nacional', dep:'Departamento', mun:'Municipio', zona:'Zona', pue:'Puesto' };
+    const labels = { nacional:'Nacional', dep:'Departamento', mun:'Municipio', zona: rotuloUnidad(), pue:'Puesto' };
     b.textContent = labels[lvl];
   }
   function renderDrillNav(){
@@ -1712,18 +1757,19 @@
     if (currentZon){
       parts.push(`<span class="drill-sep">›</span>`);
       if (currentPue){
-        parts.push(`<span class="drill-crumb clickable" onclick="drillBackTo('zona')">Zona ${currentZon}</span>`);
+        parts.push(`<span class="drill-crumb clickable" onclick="drillBackTo('zona')">${nombreUnidad(currentZon)}</span>`);
       } else {
-        parts.push(`<span class="drill-crumb active">Zona ${currentZon}</span>`);
+        parts.push(`<span class="drill-crumb active">${nombreUnidad(currentZon)}</span>`);
       }
     }
     if (currentPue){
       parts.push(`<span class="drill-sep">›</span>`);
-      parts.push(`<span class="drill-crumb active">Puesto ${currentPue}</span>`);
+      parts.push(`<span class="drill-crumb active">${rotuloPuesto(currentPue)}</span>`);
     }
     nav.innerHTML = parts.join('');
   }
   function drillBackTo(level){
+    if (level === 'dep' && currentDep === '16') return clearFilters();
     if (level === 'dep'){
       currentMun = ''; currentZon = ''; currentPue = '';
       document.getElementById('mun-select').value = '';
@@ -1768,7 +1814,7 @@
         s = new Array(11).fill(0); let n = 0;
         for (const [k, v] of Object.entries(d.puestos)){
           const [mu, zz, pp] = k.split('-');
-          if (mu !== currentMun || (currentZon && zz !== currentZon) || (currentPue && pp !== currentPue)) continue;
+          if (mu !== currentMun || (currentZon && unidadDe(zz) !== currentZon) || (currentPue && (zz + '-' + pp) !== currentPue)) continue;
           v.forEach((x, i) => s[i] += x); n++;
         }
         if (!n) s = null;
@@ -1777,7 +1823,7 @@
     if (!s || !(s[0] + s[1])){ card.style.display = 'none'; return; }
     card.style.display = '';
     card.classList.toggle('pf-lock', !_planDescarga());
-    const terr = nombreTerritorio() + (currentZon ? ` · zona ${currentZon}` : '') + (currentPue ? ` · puesto ${currentPue}` : '');
+    const terr = nombreTerritorio() + (currentZon ? ` · ${nombreUnidad(currentZon)}` : '') + (currentPue ? ` · ${rotuloPuesto(currentPue).toLowerCase()}` : '');
     document.getElementById('pf-label').textContent = `Quién vota · sexo y edad · ${terr}`;
     const pc = (a, t) => t ? a / t * 100 : 0;
     const SEX = [['Mujeres', '#c2569b'], ['Hombres', '#3d6fff']];
@@ -1948,7 +1994,8 @@
 
   // ─── Mapa Leaflet ─────────────
   async function initMap(){
-    alcMap = L.map('alc-map', { zoomControl: true, attributionControl: false, preferCanvas: false, scrollWheelZoom: true, zoomSnap: 0.25 }).setView([4.5, -73.5], 6);
+    // Mapa fijo en su caja: sin arrastrar ni zoom; el clic sigue bajando de nivel.
+    alcMap = L.map('alc-map', { zoomControl: false, attributionControl: false, preferCanvas: false, scrollWheelZoom: false, dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, zoomSnap: 0.25 }).setView([4.5, -73.5], 6);
     depGeoRaw = await fetch(DEP_GEO_URL).then(r => r.json());
     // ResizeObserver: si el container cambia de tamaño (preview iframe, resize de
     // ventana, mostrar/ocultar panel), invalidamos size y reajustamos bounds.
@@ -1959,24 +2006,30 @@
       resizeT = setTimeout(() => {
         if (!alcMap) return;
         alcMap.invalidateSize();
-        if (currentLayer && currentLayer.getBounds && currentLayer.getBounds().isValid()){
+        if (_ultimoEncuadre) alcMap.fitBounds(_ultimoEncuadre, { padding: [12, 12] });
+        else if (currentLayer && currentLayer.getBounds && currentLayer.getBounds().isValid()){
           alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] });
         }
       }, 60);
     }).observe(wrap);
     updateMap();
   }
-  function clearLayer(){ if (currentLayer){ alcMap.removeLayer(currentLayer); currentLayer = null; } }
+  let _ultimoEncuadre = null;
+  function clearLayer(){ _ultimoEncuadre = null; if (currentLayer){ alcMap.removeLayer(currentLayer); currentLayer = null; } }
 
   async function updateMap(){
     if (!alcMap) return;
     clearLayer();
-    if (currentMun && currentDep){
+    if (currentMun && currentDep && tipoUnidad() !== 'zona' && await renderCiudadLayer()){
+      const b = document.getElementById('map-back-btn');
+      b.classList.add('show');
+      b.textContent = currentPue ? '← ' + rotuloUnidad() : (currentZon ? '← Ciudad' : (currentDep === '16' ? '← Nacional' : '← Departamento'));
+    } else if (currentMun && currentDep){
       // Vista mun (o zona/puesto): capa del depto con zoom al mun
       await renderDepLayer(currentDep, currentMun);
       document.getElementById('map-back-btn').classList.add('show');
       document.getElementById('map-back-btn').textContent =
-        currentPue ? '← Zona' : (currentZon ? '← Municipio' : '← Departamento');
+        currentPue ? '← ' + rotuloUnidad() : (currentZon ? '← ' + (tipoUnidad() === 'zona' ? 'Municipio' : 'Ciudad') : (currentDep === '16' ? '← Nacional' : '← Departamento'));
     } else if (currentDep){
       await renderDepLayer(currentDep);
       document.getElementById('map-back-btn').classList.add('show');
@@ -1985,6 +2038,83 @@
       renderNacionalLayer();
       document.getElementById('map-back-btn').classList.remove('show');
     }
+  }
+
+  // ─── Capa de ciudad: localidades de Bogotá (giradas 90° a la izquierda, convención del
+  // proyecto) y comunas de Medellín. Color = ganador de la unidad sumando sus puestos.
+  const CIUDAD_GEO = {
+    loc: { url: `${MAPS}/Ciudades-COM-LOC/BOG-LOCALIDADX.json`, rotar: true,  cod: p => pad(p.LocCodigo, 2) },
+    com: { url: `${MAPS}/Ciudades-COM-LOC/MEDELLINX.json`,      rotar: false, cod: p => { const c = pad(p.CODIGO, 2); return +c >= 50 ? '99' : c; } },
+  };
+  const _ciudadGeo = {};
+  function rotar90(geo){
+    const cx = -74.08, cy = 4.65;
+    const rc = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
+    const rg = g => !g ? g : g.type === 'Polygon' ? { ...g, coordinates: g.coordinates.map(r => r.map(rc)) }
+      : g.type === 'MultiPolygon' ? { ...g, coordinates: g.coordinates.map(p => p.map(r => r.map(rc))) } : g;
+    return { ...geo, features: geo.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
+  }
+  async function renderCiudadLayer(){
+    const t = tipoUnidad(), cfg = CIUDAD_GEO[t];
+    if (!cfg) return false;
+    let geo = _ciudadGeo[t];
+    try {
+      if (!geo){
+        geo = await fetch(cfg.url).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+        if (cfg.rotar) geo = rotar90(geo);
+        _ciudadGeo[t] = geo;
+      }
+    } catch (e){ console.warn('[ciudad]', e); return false; }
+    const puestos = await ensurePuestosLoaded(currentDep);
+    const porU = {};
+    for (const p of puestos){
+      if (p.mun !== currentMun) continue;
+      (porU[unidadDe(p.zz)] = porU[unidadDe(p.zz)] || []).push(p);
+    }
+    const win = {};
+    for (const [u, pps] of Object.entries(porU)) win[u] = { g: winnerFromPuestos(pps), pps };
+    const mMeta = munsAll.find(x => x.dep === currentDep && x.mun === currentMun);
+    clearLayer();
+    currentLayer = L.geoJSON(geo, {
+      style: f => {
+        const u = cfg.cod(f.properties), w = win[u];
+        const sel = currentZon && u === currentZon;
+        return { fillColor: w && w.g ? colorForRow(w.g) : 'rgba(120,120,120,.18)',
+                 fillOpacity: currentZon && !sel ? 0.35 : 0.8,
+                 color: sel ? '#fff' : themeStroke(), weight: sel ? 2.4 : 0.7 };
+      },
+      onEachFeature: (f, lyr) => {
+        const u = cfg.cod(f.properties), w = win[u];
+        const nom = nombreUnidad(u);
+        lyr.bindTooltip(nom, { sticky: true, direction: 'top', offset: [0, -8], opacity: 1 });
+        lyr.on('mouseover', e => {
+          e.target.setStyle({ weight: 2, color: '#fff' });
+          const g = w && w.g;
+          const vv = w ? w.pps.reduce((s, p) => s + (p.votos_validos || 0), 0) : 0;
+          document.getElementById('hover-card-label').textContent = rotuloUnidad();
+          document.getElementById('hover-detail').innerHTML = `<div class="tt-title">${nom}</div>` + (w ? `
+            <div class="tt-row"><span>Puestos</span><b>${fmtN(w.pps.length)}</b></div>
+            <div class="tt-row"><span>Válidos</span><b>${fmtN(vv)}</b></div>
+            ${g ? `<div class="tt-divider"></div><div class="tt-row"><span>Más votado</span><b></b></div>
+              <div class="tt-cand">${tCase(g.nombre)}</div><div class="tt-party">${g.partido || '—'}</div>
+              <div class="tt-pct">${fmtPct(g.pct)}</div><div class="tt-votos">${fmtN(g.votos)} votos</div>` : ''}`
+            : `<div class="tt-row" style="margin-top:.6rem"><span>Sin puestos con datos.</span></div>`);
+        });
+        lyr.on('mouseout', e => currentLayer && currentLayer.resetStyle(e.target));
+        if (w) lyr.on('click', () => { document.getElementById('zon-select').value = u; onZonChange(u); });
+      }
+    }).addTo(alcMap);
+    // Encuadre: la unidad elegida, o la parte urbana (Sumapaz y los corregimientos son
+    // tan grandes que dejarían la ciudad diminuta en la caja; se ven igual, recortados).
+    let caja = null;
+    currentLayer.eachLayer(l => {
+      const u = cfg.cod(l.feature.properties);
+      const entra = currentZon ? u === currentZon : !(u === '20' && t === 'loc') && u !== '99';
+      if (entra) caja = caja ? caja.extend(l.getBounds()) : L.latLngBounds(l.getBounds().getSouthWest(), l.getBounds().getNorthEast());
+    });
+    _ultimoEncuadre = caja && caja.isValid() ? caja : null;
+    alcMap.fitBounds(_ultimoEncuadre || currentLayer.getBounds(), { padding: [10, 10] });
+    return true;
   }
   // Mapas por código (rápido y robusto). Construidos al cargar datos.
   const _depByCod = {};   // {depCod: depRecord}
@@ -2169,6 +2299,7 @@
       ps.innerHTML = '<option value="">TODOS</option>'; ps.disabled = true;
       renderAll();
     } else if (currentMun){
+      if (currentDep === '16') return clearFilters();   // Bogotá: la ciudad es el departamento
       currentMun = '';
       document.getElementById('mun-select').value = '';
       resetZonPueSelects();
