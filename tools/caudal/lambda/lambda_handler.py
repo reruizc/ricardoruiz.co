@@ -968,12 +968,22 @@ def _sanciones_stats():
 # y Territorial. Se exige el arranque de un acto («Por la cual…») porque los
 # conceptos de la DIAN tratan vacaciones o encargos como tema tributario.
 _ACTO_ARRANQUE_RE = re.compile(r'^\s*(por (la|medio de la|medio del|el) cual|mediante la cual)')
+# (nov-2026) Las seccionales de la DIAN escriben el horario de 30 maneras:
+# «horarios laborales flexibles», «hora laboral de salida», «se habilitan como
+# días laborales», «se declara administrativamente como hábil». Ojo con
+# «horario» suelto: un acuerdo que regula el horario de funcionamiento de los
+# bares SÍ regula a terceros, por eso va solo con trabajo/atención/laboral.
 _ACTO_INTERNO_RE = re.compile(
-    r'horario (de|laboral)|jornada (laboral|de integracion)|dias? habiles|administrativamente habil'
+    r'horarios? (de trabajo|de atencion|laboral(es)?|especial|excepcional|transitorio|flexible)'
+    r'|ampliacion de horario|cambio de horario|hora laboral'
+    r'|jornada (laboral|de integracion)|dias? (habiles|laboral(es)?)|como dia laboral'
+    r'|administrativamente (como )?habil'
     r'|firma mecanica|comision de personal|nombramiento|ubicaciones|encargos?\b'
     r'|planta (global|de personal|de empleos)|manual (especifico )?de (requisitos|funciones)'
-    r'|trabajo en casa|teletrabajo|vacaciones colectivas|competencias (especificas|laborales)'
-    r'|evaluacion del desempeno|escala de asignacion|representantes? de los empleados')
+    r'|trabajo en casa|teletrabajo|vacaciones colectivas'
+    r'|evaluacion del desempeno|escala de asignacion|representantes? de los empleados'
+    r'|delega(n|cion)? (una |especial )*(de )?funciones|se delegan funciones|planta de cargos'
+    r'|recursos? de (reposicion|apelacion)')
 
 
 def _es_acto_interno(texto):
@@ -4259,7 +4269,90 @@ def _reg_con_nombre(r):
     return (r.get('sancionado') or '').strip() not in ('', '—', '-', 'N/A')
 
 
-def _bloque_regulatorio(dels, vig_keys, cap=6):
+# --- Precisión del radar de un cliente con nombre (nov-2026) -----------------
+# Medido en producción el 16-nov con Comfama: de 12 señales regulatorias servían
+# 4. Las demás eran sanciones del INVIMA a terceros (cosméticos, empanadas) que
+# entraban porque el perfil usa el sector «salud» completo, una cláusula penal
+# de SECOP a una persona natural que casaba el tema «aseguramiento en salud» y
+# resoluciones de seguimiento ambiental de la ANLA a la competencia. Para un
+# cliente con interlocutores declarados, lo que le habla es lo que expiden ESAS
+# entidades; la sanción a un tercero cualquiera de su sector es ruido.
+
+def _comp_keys(s):
+    """Llaves de la competencia: el preset la trae en `competencia`, el perfil
+    guardado en `competencia_keys`."""
+    return {k for k in list(s.get('competencia') or []) + list(s.get('competencia_keys') or [])
+            if isinstance(k, str)}
+
+
+def _inter_todas(s):
+    """Interlocutores plegados en sus dos formas: la sigla tal cual («dian») y
+    el nombre largo al que la traduce _DO_SIGLAS. Las fuentes del Regulatorio
+    se llaman de las dos maneras («DIAN · Resoluciones…», «Superintendencia
+    Nacional de Salud»)."""
+    out = set()
+    for x in (s.get('interlocutores') or []):
+        f = _fold_q(x)
+        if len(f) >= 3:
+            out.add(f)
+            out.add(_DO_SIGLAS.get(f, f))
+    return out
+
+
+def _fuente_interlocutor(r, inter):
+    fn = _fold_q(r.get('fuente_nombre') or '')
+    if not fn or not inter:
+        return False
+    for i in inter:
+        if len(i) <= 12:
+            if re.search(r'\b' + re.escape(i) + r'\b', fn):
+                return True
+        elif i in fn:
+            return True
+    return False
+
+
+def _titulo_toca_nucleo(titulo, temas):
+    """El título nombra TODAS las palabras con cuerpo de un tema de dos o más
+    palabras (raíz de 6 letras, en cualquier orden): «Servicio de Transporte
+    Intermediado por Plataformas» casa «transporte por plataformas»."""
+    tf = _fold_q(titulo or '')
+    for t in temas:
+        for alt in str(t).split('/'):
+            af = _fold_q(alt).strip()
+            # raíces propias, no las de eventos: allá «familiar», «general» y
+            # «nación» son palabras vacías y acá son el tema («subsidio
+            # familiar», «presupuesto general de la nación»)
+            raices = [w[:6] for w in af.split() if len(w) >= 4 and w not in _NUCLEO_STOP]
+            if len(raices) >= 2:
+                if all(re.search(r'\b' + re.escape(w), tf) for w in raices):
+                    return True
+            elif len(af.split()) >= 2 and _tiene(af, tf):
+                return True          # «ley de rescate»: la frase tal cual
+    return False
+
+
+_NUCLEO_STOP = frozenset(('para', 'sobre', 'entre', 'como', 'desde', 'otras'))
+
+
+_COMP_REG_RE = re.compile(
+    r'\b(super(intendencia|salud|subsidio|sociedades|financiera|industria)\w*|sancion\w*|multa\w*'
+    r'|investigacion\w*|ministeri\w*|gobierno|decreto|resolucion|ley|reforma|congreso|demanda\w*'
+    r'|medicamentos?|eps|afiliad\w*|subsidios?|tarifas?|licitacion\w*|contrato|crisis|denuncia\w*'
+    r'|intervencion|liquidacion|fusion|alianza|adquisicion|compra)\b')
+
+
+def _titulo_nombra_tema(titulo, temas):
+    """El titular nombra alguno de los temas (raíz de 6 letras de sus palabras
+    con cuerpo, como en eventos). Sin esto la prensa del sector traía el
+    nombramiento de un embajador en Uruguay porque la nota decía «laboral» en
+    el cuerpo."""
+    tf = _fold_q(titulo or '')
+    raices = [w for t in temas for w in _evt_palabras(t)]
+    return not raices or any(re.search(r'\b' + re.escape(w), tf) for w in raices)
+
+
+def _bloque_regulatorio(dels, vig_keys, cap=6, sin_alta=False):
     """Las `cap` señales regulatorias del sector, ya priorizadas y redactadas."""
     corte = str(caudal_core.REF_YEAR - 3)
     es_sanc = lambda r: (r.get('tipo_acto') or 'sancion') == 'sancion'
@@ -4303,6 +4396,11 @@ def _bloque_regulatorio(dels, vig_keys, cap=6):
         else:
             accion = _REG_ACCION.get(acto, _REG_ACCION['otro'])
             nivel = 'alto' if (reciente and acto == 'apertura_investigacion') else 'medio'
+        # (nov-2026) para un cliente con nombre, lo que le pasó a un TERCERO de
+        # su sector es contexto: nunca alta (una investigación a una IPS
+        # cualquiera salía en alta en el radar de Comfama)
+        if sin_alta and nivel == 'alto':
+            nivel = 'medio'
         # Sin destinatario real, el titular es el ACTO. Devolver un guion deja
         # una tarjeta en blanco en la pantalla del cliente, que es peor que no
         # mostrarla: parece un error nuestro.
@@ -4377,10 +4475,12 @@ PERFIL_EMP_MEDIOS  = 5     # empresas que se buscan por nombre en prensa
 PERFIL_MEDIOS_DIAS = 21    # prensa de vigiladas: ventana más larga que la del sector
 
 
-def _regulatorio_para_empresas(emps, cap=6):
+def _regulatorio_para_empresas(emps, cap=6, omitir=None, comp=None, tope_comp=2):
     """Sanciones cuyo destinatario ES una de las vigiladas (identidad, no tema).
     Filtro por palabra completa + vetos del diccionario — el mismo gate que usa
-    el pilar Regulatorio, así que hereda su precisión medida."""
+    el pilar Regulatorio, así que hereda su precisión medida.
+    `omitir(e, r)` descarta ANTES del reparto por turnos (si se filtrara
+    después, los cupos se gastarían en lo que luego se bota)."""
     if not emps:
         return []
     por_emp = {}
@@ -4390,13 +4490,20 @@ def _regulatorio_para_empresas(emps, cap=6):
             continue
         for e in emps:
             if empresas.casa_registro(e, nombre):
-                por_emp.setdefault(e['nombre'], []).append(r)
+                if not (omitir and omitir(e, r)):
+                    por_emp.setdefault(e['nombre'], []).append(r)
                 break
     for v in por_emp.values():
         v.sort(key=lambda r: r.get('fecha', '') or '', reverse=True)
     # round-robin: una vigilada con 40 sanciones no puede acaparar el panel y
     # dejar sin ver a las otras. Se muestra la más reciente de cada una, luego
     # la segunda de cada una, y así.
+    # cada competidor, máximo `tope_comp` (Colsubsidio, con farmacias, tiene
+    # decenas de actos del INVIMA y se quedaba con cuatro cupos)
+    comp_nom = {e['nombre'] for e in emps if e.get('k') in (comp or set())}
+    for n in comp_nom:
+        if n in por_emp:
+            por_emp[n] = por_emp[n][:tope_comp]
     out, i = [], 0
     while len(out) < cap and any(len(v) > i for v in por_emp.values()):
         for quien, v in por_emp.items():
@@ -4406,7 +4513,7 @@ def _regulatorio_para_empresas(emps, cap=6):
     return out
 
 
-def _medios_para_empresas(emps, cap=5):
+def _medios_para_empresas(emps, cap=5, comp=None, tope_comp=2):
     """Prensa que nombra a las vigiladas. Ventana más larga que la del sector:
     que salga tu empresa en un titular es raro y sigue siendo noticia a 3
     semanas. Devuelve [(nombre_vigilada, evento)]."""
@@ -4442,14 +4549,27 @@ def _medios_para_empresas(emps, cap=5):
     por = {}
     for hit, r in out:
         por.setdefault(hit, []).append((hit, r))
-    turnos = []
+    # (nov-2026) y con tope por competidor: Comfama sin prensa propia quedaba
+    # con cinco notas de la misma crisis de Colsubsidio. La propia empresa no
+    # tiene tope; cada competidor, dos.
+    comp = comp or set()
+    usados, turnos = {}, []
     while len(turnos) < cap and any(por.values()):
+        avanzo = False
         for e in emps:
             lst = por.get(e['nombre'])
-            if lst:
-                turnos.append(lst.pop(0))
-                if len(turnos) >= cap:
-                    break
+            if not lst:
+                continue
+            if e.get('k') in comp and usados.get(e['nombre'], 0) >= tope_comp:
+                por[e['nombre']] = []
+                continue
+            turnos.append(lst.pop(0))
+            usados[e['nombre']] = usados.get(e['nombre'], 0) + 1
+            avanzo = True
+            if len(turnos) >= cap:
+                break
+        if not avanzo:
+            break
     return turnos
 
 
@@ -4501,7 +4621,7 @@ def _eventos_para_perfil(s, emps_vig, cap=4):
               + [('entidad', x) for x in inter])
     if not planes:
         return []
-    ck = f'eventos2-{_hash24("|".join(f"{a}:{b}" for a, b in planes))}-{_medios_cache_bucket()}'
+    ck = f'eventos3-{_hash24("|".join(f"{a}:{b}" for a, b in planes))}-{_medios_cache_bucket()}'
     cached = _cache_get(ck)
     if cached is not None:
         return cached.get('items', [])
@@ -4537,7 +4657,9 @@ def _eventos_para_perfil(s, emps_vig, cap=4):
             out.append({'tipo': 'eventos', 'titulo': tit, 'url': e.get('url'),
                         'medio': e.get('medio'), 'fecha': e.get('fecha'),
                         'sobre': t, 'por': modo,
-                        'nivel': 'alto' if (modo == 'nombre' or reciente) else 'medio',
+                        # (nov-2026) un foro del sector no exige decisión: solo
+                        # sube a alta el que nombra a la propia organización
+                        'nivel': 'alto' if modo == 'nombre' else ('medio' if reciente else 'bajo'),
                         'accion': ('Evento que nombra a la organización — confirmar participación o vocería'
                                    if modo == 'nombre' else
                                    'Evento del sector — evaluar asistencia, vocería o patrocinio')})
@@ -4569,11 +4691,16 @@ def _sucop_para_perfil(s, cap=4):
     for r in hits[:cap]:
         ent = r.get('entidad') or ''
         suya = any(i in _fold_q(ent) or _fold_q(ent) in i for i in inter)
+        # (nov-2026) que cierre pronto no basta para ser alta: el borrador de la
+        # Aerocivil sobre consumo de psicoactivos de tripulantes casaba «laboral»
+        # en el cuerpo. Alta si es de un interlocutor o si el TÍTULO nombra el tema.
+        tit_f = _fold_q(r.get('titulo') or '')
+        toca_tit = any(_tiene(t, tit_f) for t in temas)
         fin = r.get('fecha_fin') or ''
         out.append({'tipo': 'sucop', 'titulo': (r.get('titulo') or '')[:200], 'entidad': ent,
                     'url': r.get('url') or '', 'fecha': r.get('fecha_inicio') or '',
                     'cierra': fin, 'dias': r.get('dias_restantes'),
-                    'nivel': 'alto' if (r.get('estado_consulta') == 'cierra_pronto' or suya) else 'medio',
+                    'nivel': 'alto' if (suya or (r.get('estado_consulta') == 'cierra_pronto' and toca_tit)) else 'medio',
                     'accion': ('Borrador nuevo en el sitio de la entidad. Caudal no tiene su texto ni su plazo: '
                                'el título sale de la dirección web y hay que abrirlo en el navegador'
                                if r.get('sin_texto') else
@@ -4669,11 +4796,15 @@ def _do_para_perfil(s, cap=5, emps=None):
     # NOMBRA entra aunque no toque un tema, y va al Sur. Ahí no se descarta lo
     # que parece trámite: una «toma de posesión» de una caja no es un nombramiento.
     vig_rx = []
+    comp = _comp_keys(s)
+    comp_nom = set()
     for e in (emps or []):
         al = [_fold_q(a) for a in (e.get('alias') or []) + [e.get('nombre') or ''] if len(_fold_q(a)) >= 4]
         if al:
             vig_rx.append((e.get('nombre') or e.get('k'),
                            re.compile(r'\b(?:' + '|'.join(re.escape(a) for a in dict.fromkeys(al)) + r')\b')))
+            if e.get('k') in comp:
+                comp_nom.add(e.get('nombre') or e.get('k'))
     if not temas and not inter and not vig_rx:
         return [], 0
     corte = (datetime.date.today() - datetime.timedelta(days=DO_VENTANA_DIAS)).isoformat()
@@ -4715,7 +4846,13 @@ def _do_para_perfil(s, cap=5, emps=None):
         ef = _fold_q(r.get('entidad') or '')
         if (ef, r.get('numero'), r.get('anio')) in ya:
             continue
-        vig = next((n for n, rx in vig_rx if rx.search(r.get('q') or '')), None)
+        # un COMUNICADO solo cuenta como «nombra a tu vigilada» si la nombra en
+        # el TÍTULO: el blog del Servicio Público de Empleo publica cada taller
+        # de las agencias de las cajas («Jornada premasivo. COMFAMA – …») y
+        # entraban como normas de prioridad alta (nov-2026)
+        donde = (_fold_q(r.get('titulo') or '') if r.get('tipo') == 'COMUNICADOS'
+                 else (r.get('q') or ''))
+        vig = next((n for n, rx in vig_rx if rx.search(donde)), None)
         if vig:
             vig_hits.append(({**r, '_e': ef, 'publicacion': {'fecha': f}, '_sitio': True}, vig,
                              _do_es_suya(ef, inter) if inter else False))
@@ -4728,7 +4865,10 @@ def _do_para_perfil(s, cap=5, emps=None):
             continue                     # del sitio propio solo entra lo que toca un tema
         suya = bool(inter) and _do_es_suya(ef, inter)
         tema_hits.append(({**r, '_e': ef, 'publicacion': {'fecha': f}, '_sitio': True}, toca, suya))
-    orden = lambda x: (0 if x[2] else 1, -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
+    # los comunicados van DESPUÉS de las normas: «MinTrabajo convoca una mesa»
+    # no puede ocupar el cupo de la resolución que cambia una obligación
+    orden = lambda x: (x[0].get('tipo') == 'COMUNICADOS', 0 if x[2] else 1,
+                       -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
     tema_hits.sort(key=orden)
     solo_ent.sort(key=orden)
     vig_hits.sort(key=lambda x: -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
@@ -4740,16 +4880,24 @@ def _do_para_perfil(s, cap=5, emps=None):
     for r, toca, suya, vig in elegidos:
         pub = r.get('publicacion') or {}
         try:
-            reciente = (hoy - datetime.date.fromisoformat(pub.get('fecha') or '')).days <= 7
+            dias = (hoy - datetime.date.fromisoformat(pub.get('fecha') or '')).days
         except ValueError:
-            reciente = False
-        nivel = 'alto' if vig or (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
+            dias = 999
+        # (nov-2026) alta = le toca decidir: un acto que nombra a la propia
+        # empresa, o uno de su tema expedido por un interlocutor en las dos
+        # últimas semanas. Lo de la competencia y lo viejo baja.
+        if vig:
+            nivel = 'medio' if vig in comp_nom else 'alto'
+        elif toca and suya and dias <= 15:
+            nivel = 'alto'
+        else:
+            nivel = 'medio' if toca else 'bajo'
         nom = f"{(r.get('subtipo') or r.get('tipo') or '').capitalize()} {r.get('numero')} de {r.get('anio')}"
         comunicado = r.get('tipo') == 'COMUNICADOS'
-        if comunicado:                   # sin número, y sin nombrar a una vigilada no sube de medio
+        if comunicado:                   # sin número: es contexto, no una norma
             nom = f"Comunicado del {pub.get('fecha') or ''}"
-            if not vig and nivel == 'alto':
-                nivel = 'medio'
+            if not vig:
+                nivel = 'bajo'
         if vig:
             acc_v = (f'{nom} nombra a {vig} — revisar qué le cambia y si te toca a ti también')
         if r.get('_sitio'):
@@ -4797,7 +4945,10 @@ def _eventos_oficiales(s, cap=3):
         out.append({'tipo': 'eventos', 'titulo': e.get('titulo'), 'url': e.get('url') or '',
                     'medio': f"{e.get('entidad')} · calendario oficial", 'fecha': e.get('dia'),
                     'lugar': e.get('lugar') or '', 'sobre': toca or '', 'por': 'calendario',
-                    'nivel': 'alto' if (suya and (toca or social)) else 'medio',
+                    # alta solo la socialización de un interlocutor (lo pidió
+                    # Comfama por escrito); una plenaria del Concejo que toca un
+                    # tema es contexto
+                    'nivel': 'alto' if (suya and social) else 'medio',
                     'accion': ('Jornada de socialización de la entidad — inscribirse y llevar posición'
                                if social else 'Evento oficial de la entidad — evaluar asistencia')})
     out.sort(key=lambda x: (0 if x['nivel'] == 'alto' else 1, x.get('fecha') or ''))
@@ -4873,7 +5024,10 @@ def _agendas_norte(s, cap=4):
                     'entidad': f.get('entidad'), 'url': f.get('url') or '', 'fecha': f.get('novedad_fecha') or '',
                     'prevista': _agenda_prevista(f), 'novedad': nov or '', 'sobre': toca or '',
                     'conservada': bool(f.get('conservada')), 'lectura': (f.get('capturado') or '')[:10],
-                    'nivel': 'alto' if (nov and suya) else ('medio' if nov else 'bajo'),
+                    # (nov-2026) la novedad de un interlocutor sin tema no es
+                    # alta: la SIC moviendo su agenda de patentes salía en alta
+                    # para DiDi y Binance
+                    'nivel': 'alto' if (nov and suya and toca) else ('medio' if (nov and toca) else 'bajo'),
                     'accion': _agenda_accion(f)})
     return out, avisos
 
@@ -6398,8 +6552,28 @@ def handler(event, context):
         # Se resuelven ANTES que el sector para poder descontar duplicados: una
         # sanción a Bancolombia es a la vez "del sector financiero" y "de tu
         # vigilada", y mostrarla dos veces infla el radar.
+        # (nov-2026) Precisión para el cliente con nombre: la competencia y los
+        # interlocutores se separan de la propia empresa. Ver _comp_keys.
+        comp = _comp_keys(s)
+        inter_all = _inter_todas(s)
+        estricto = bool(inter_all) and bool(s.get('cliente') or s.get('k') == 'perfil')
+        k_de = {e.get('nombre'): e.get('k') for e in emps_vig}
+        es_comp = lambda quien: k_de.get(quien) in comp
+        corte_comp = str(caudal_core.REF_YEAR - 3)
+
+        def _omitir_vig(e, r):
+            # De la competencia solo interesa lo que le pasó: sanciones e
+            # investigaciones de los últimos tres años. El seguimiento ambiental
+            # de una bolsa plástica de Colsubsidio o una multa de Compensar de
+            # 2017 no le dicen nada a Comfama.
+            if e.get('k') not in comp:
+                return False
+            acto = r.get('tipo_acto') or 'sancion'
+            return (acto not in ('sancion', 'apertura_investigacion')
+                    or (r.get('fecha') or '')[:4] < corte_comp)
+
         reg_vig, vig_keys = [], set()
-        for quien, r in _regulatorio_para_empresas(emps_vig):
+        for quien, r in _regulatorio_para_empresas(emps_vig, omitir=_omitir_vig, comp=comp):
             yr = (r.get('fecha') or '')[:4]
             reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
             vig_keys.add((r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
@@ -6421,10 +6595,15 @@ def handler(event, context):
                             # que el cliente vigila es alta prioridad aunque sea
                             # una resolución de trámite. En el bloque de SECTOR sí
                             # se distingue, porque ahí el acto es de un tercero.
-                            'nivel': 'alto' if reciente else 'medio',
-                            'accion': (f'{lbl} contra {quien}, empresa que vigilas — '
-                                       'documentar el caso y su exposición') if reciente else
-                                      f'Antecedente regulatorio de {quien} ({lbl.lower()})'})
+                            # (nov-2026) alta solo si es la PROPIA empresa: lo de
+                            # la competencia es inteligencia, no una decisión suya
+                            'nivel': ('medio' if es_comp(quien) else 'alto') if reciente
+                                     else ('bajo' if es_comp(quien) else 'medio'),
+                            'accion': (f'{lbl} contra {quien} (competencia) — ver si el hecho '
+                                       'se parece a tu operación') if es_comp(quien) else
+                                      (f'{lbl} contra {quien} — documentar el caso y su exposición'
+                                       if reciente else
+                                       f'Antecedente regulatorio de {quien} ({lbl.lower()})')})
         reg, n_sanc, n_otros = [], 0, 0
         # El sector del perfil es UNO solo, y desde ago-2026 eso se quedó corto:
         # a un exchange de criptoactivos le pega la UIAF (financiero), la
@@ -6443,6 +6622,10 @@ def handler(event, context):
         if s.get('sector_sanciones'):
             for r in _sanciones():
                 if r.get('sector') == s['sector_sanciones']:
+                    # cliente con interlocutores: solo lo que expiden ellos
+                    # (Supersalud sí, el INVIMA a un fabricante de cosméticos no)
+                    if estricto and not _fuente_interlocutor(r, inter_all):
+                        continue
                     dels.append(r)
                     vistos.add(id(r))
         temas_reg = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
@@ -6452,26 +6635,48 @@ def handler(event, context):
                     continue
                 blob = r.get('q') or ''
                 if any(_tiene(t, blob) for t in temas_reg):
+                    # cliente con interlocutores: por tema solo entra lo que
+                    # expiden ellos. La ANLA archivando un expediente cualquiera
+                    # casaba «seguridad social» en el cuerpo del acto (nov-2026).
+                    if estricto and not _fuente_interlocutor(r, inter_all):
+                        continue
                     dels.append(r)
                     vistos.add(id(r))
         if dels:
             sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
             n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
-            reg = _bloque_regulatorio(dels, vig_keys)
+            # cliente con nombre: lo de terceros es contexto, así que menos
+            # cupos y sin las liquidaciones de la contribución a la Supersalud
+            # de IPS cualquiera (se cuentan, no se muestran)
+            if estricto:
+                ver = [r for r in dels if r.get('tipo_acto') != 'contribucion_especial'
+                       and 'contribucion' not in _fold_q(r.get('motivo') or '')[:160]]
+                reg = _bloque_regulatorio(ver, vig_keys, cap=4, sin_alta=True)
+            else:
+                reg = _bloque_regulatorio(dels, vig_keys)
         med, n_med, n_med_ext = [], 0, 0
         cutoff = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 5 * 86400))
         med_vig, vig_urls = [], set()
         try:
-            for quien, r in _medios_para_empresas(emps_vig):
+            for quien, r in _medios_para_empresas(emps_vig, comp=comp):
                 vig_urls.add(r.get('url'))
                 reciente = (r.get('fecha') or '') >= cutoff
+                c_ = es_comp(quien)
+                # de la competencia solo lo que toca un tema del cliente o al
+                # regulador: «Murió la Mujer Cafam» o «gana el premio Mujer
+                # Comfenalco» no le dicen nada a Comfama (nov-2026)
+                if c_ and not (_titulo_nombra_tema(r.get('titulo'), s.get('temas', []))
+                               or _COMP_REG_RE.search(_fold_q(r.get('titulo') or ''))):
+                    continue
                 med_vig.append({'tipo': 'medios', 'vigilada': quien, 'medio': r.get('medio'),
                                 'titulo': r.get('titulo'), 'url': r.get('url'),
                                 'fecha': r.get('fecha'), 'alcance': r.get('alcance'),
-                                'nivel': 'alto' if reciente else 'medio',
-                                'accion': (f'{quien} en prensa — evaluar respuesta o vocería'
-                                           if reciente else
-                                           f'Cobertura de {quien} — seguimiento')})
+                                'nivel': ('medio' if c_ else 'alto') if reciente
+                                         else ('bajo' if c_ else 'medio'),
+                                'accion': (f'{quien} (competencia) en prensa — ver si el tema '
+                                           'te toca o te deja una oportunidad') if c_ else
+                                          (f'{quien} en prensa — evaluar respuesta o vocería'
+                                           if reciente else f'Cobertura de {quien} — seguimiento')})
         except Exception as e:
             print(f'[cliente] medios vigiladas FAIL: {type(e).__name__}: {e}')
         # el sector se busca aunque el perfil no tenga temas propios (puede ser
@@ -6485,10 +6690,13 @@ def handler(event, context):
                 break
             if r.get('url') in vig_urls:
                 continue
+            if not _titulo_nombra_tema(r.get('titulo'), s.get('temas', [])[:4]):
+                continue
             reciente = (r.get('fecha') or '') >= cutoff
             med.append({'tipo': 'medios', 'medio': r.get('medio'), 'titulo': r.get('titulo'),
                         'url': r.get('url'), 'fecha': r.get('fecha'), 'alcance': r.get('alcance'),
-                        'nivel': 'alto' if reciente else 'medio',
+                        # prensa general del sector: contexto, no decisión
+                        'nivel': 'medio' if reciente else 'bajo',
                         'accion': ('Cobertura reciente — revisar si necesita respuesta o vocería'
                                    if reciente else
                                    'Tema en el radar de prensa — monitoreo pasivo')})
@@ -6512,7 +6720,11 @@ def handler(event, context):
                                 'entidad': r.get('entidad'), 'proveedor': r.get('proveedor'),
                                 'objeto': (r.get('objeto') or '')[:170], 'valor': r.get('valor'),
                                 'departamento': r.get('departamento'), 'fecha': r.get('fecha'),
-                                'url': r.get('url'), 'nivel': 'alto' if reciente else 'medio',
+                                # un contrato firmado es un hecho cumplido: sirve de
+                                # referencia, no pide decisión; el de la competencia
+                                # es solo referencia de mercado (nov-2026)
+                                'url': r.get('url'),
+                                'nivel': 'medio' if (reciente and not es_comp(quien)) else 'bajo',
                                 'accion': (f'Contrato reciente de {quien} — revisar objeto, '
                                            'entidad y ejecución') if reciente else
                                           f'Antecedente de contratación de {quien}'})
@@ -6535,7 +6747,7 @@ def handler(event, context):
         # de mostrar, no se esconde.
         # Los 6 presets de sector siguen igual — son demo y ahí el sector ES el
         # cliente.
-        con_generica_muda = s.get('k') == 'perfil'
+        con_generica_muda = s.get('k') == 'perfil' or bool(s.get('cliente'))
         for r in ([] if con_generica_muda else con_agg['resultados']):
             if r.get('id') in vig_cids:
                 continue
@@ -6544,7 +6756,7 @@ def handler(event, context):
                         'proveedor': r.get('proveedor'), 'objeto': (r.get('objeto') or '')[:170],
                         'valor': r.get('valor'), 'departamento': r.get('departamento'),
                         'fecha': r.get('fecha'), 'url': r.get('url'),
-                        'nivel': 'alto' if reciente else 'medio',
+                        'nivel': 'medio' if reciente else 'bajo',
                         'accion': ('Contrato reciente en tu sector — revisar quién ganó y con qué '
                                    'objeto antes del próximo proceso') if reciente else
                                   'Antecedente de contratación — referencia de precios y proveedores'})
@@ -6604,6 +6816,19 @@ def handler(event, context):
             print(f'[cliente] territorial FAIL: {type(e).__name__}: {e}')
             terr, n_terr = [], 0
         senales = rc['senales'] + reg + dof + terr + med + con + suc + agd + evt + red
+        # (nov-2026) Congreso: «en trámite» ya no basta para ser alta. Con
+        # Comfama los diez proyectos salían en alta, y si todo es urgente la
+        # prioridad no sirve. Queda en alta el proyecto que es del NÚCLEO del
+        # cliente —su articulado le aplica, o el título nombra uno de sus temas
+        # de varias palabras («subsidio familiar», «transporte por
+        # plataformas»)— y que no es de vitrina. Los temas de una palabra
+        # («laboral», «tributario») traen demasiado para decidir prioridad.
+        for x in rc['senales']:
+            if x.get('nivel') != 'alto':
+                continue
+            nucleo = bool(x.get('te_aplica')) or _titulo_toca_nucleo(x.get('titulo'), s.get('temas', []))
+            if not nucleo or (x.get('empuje') or '') == 'vitrina':
+                x['nivel'] = 'medio'
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
