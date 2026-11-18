@@ -35,7 +35,7 @@
       ['pon', 'Ponentes', pon.length > 0, 'La mesa directiva de la comisión escoge a los congresistas que estudian el texto y proponen cambios. Ahí empieza la negociación real.', 'Art. 150 Ley 5ª'],
       ['inf', 'Ponencia', pub.some(p => /ponencia/i.test(p.texto)), 'Los ponentes presentan su informe, con plazo de 5 a 15 días calendario, y se publica en la Gaceta. Es el texto que se vota.', 'Arts. 153 y 156 Ley 5ª'],
       ['anu', 'Anuncio', false, 'Ningún proyecto se puede votar sin haberse anunciado en una sesión anterior. El anuncio es la señal de que la votación viene.', 'Art. 160 C.P.'],
-      ['c1', '1.º debate Cámara', /aprobado.*primer|segundo debate/.test(est), 'Vota la Comisión Tercera de la Cámara. Con mensaje de urgencia y sesión conjunta se une la del Senado, y cada una vota por separado.', 'Arts. 157 y 163 C.P.'],
+      ['c1', '1.º debate Cámara', /aprobado.*primer|segundo debate/.test(est), 'Con mensaje de urgencia votan las cuatro comisiones económicas en sesión conjunta: Terceras y Cuartas de Cámara y Senado. Cada comisión vota por separado, así que hace falta mayoría en las cuatro.', 'Arts. 157 y 163 C.P.'],
       ['p2', '2.º debate Cámara', false, 'Vota la plenaria de la Cámara. Deben pasar al menos 8 días desde el primer debate.', 'Art. 160 C.P.'],
       ['c3', '1.º debate Senado', false, 'Comisión Tercera del Senado. En trámite normal deben pasar 15 días desde la plenaria de la Cámara.', 'Art. 160 C.P.'],
       ['p4', '2.º debate Senado', false, 'Vota la plenaria del Senado, 8 días después.', 'Art. 160 C.P.'],
@@ -47,7 +47,7 @@
     return L;
   }
   function pasos(d1, m) {
-    if (m === 'urgencia') { const p = mas(d1, 8); return [[d1, 'Primer debate conjunto: Terceras de Cámara y Senado, cada una vota por separado'], [p, 'Segundo debate: las dos plenarias, pueden ser el mismo día'], [mas(p, 1), 'Conciliación, si los textos difieren']]; }
+    if (m === 'urgencia') { const p = mas(d1, 8); return [[d1, 'Primer debate conjunto: Terceras y Cuartas de Cámara y Senado, cada comisión vota por separado'], [p, 'Segundo debate: las dos plenarias, pueden ser el mismo día'], [mas(p, 1), 'Conciliación, si los textos difieren']]; }
     const p2 = mas(d1, 8), c3 = mas(p2, 15), p4 = mas(c3, 8);
     return [[d1, 'Primer debate: Tercera de Cámara'], [p2, 'Segundo debate: plenaria de Cámara, 8 días después'], [c3, 'Tercer debate: Tercera de Senado, 15 días después'], [p4, 'Cuarto debate: plenaria de Senado, 8 días después'], [mas(p4, 1), 'Conciliación, si los textos difieren']];
   }

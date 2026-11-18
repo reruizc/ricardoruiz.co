@@ -14,6 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="ley-rescate-base.css?v=20261111b" />
   <script defer src="/track.js"></script>
+  <style>.mapa .a.cam{position:relative;box-shadow:inset 0 0 0 2px #14161c}.mapa .a.cam::after{content:"⚑";position:absolute;top:-2px;right:1px;font-size:.6rem;line-height:1}.cam-ley{font-size:.75rem}.art-cam{margin:.8rem 0 0;background:#fff7e0;border-left:4px solid #d9a441;border-radius:8px;padding:.65rem .85rem;font-size:.88rem;line-height:1.5;color:var(--ink2)}.art-cam b{color:var(--ink)}</style>
 </head>
 <body>
   <main class="wrap">
@@ -22,13 +23,13 @@
     <p class="lead">Cada cuadro es un artículo. El color dice cómo se recibe su tema entre quienes toman postura, y lo tenue casi no aparece en la discusión. Busque un número o una palabra, y toque un cuadro para leer el artículo completo y bajarlo en Word.</p>
     <div id="app" hidden>
       <div class="panel"><input class="q" id="q" type="search" placeholder="Buscar: renta, IVA, DIAN, 42…" aria-label="Buscar artículo" /><div class="mapa" id="arts"></div>
-      <div class="escala"><span>Más apoyo</span><i></i><span>Más rechazo</span><span style="margin-left:1rem;color:var(--ink3)">Gris: sin postura suficiente</span></div>
+      <div class="escala"><span>Más apoyo</span><i></i><span>Más rechazo</span><span style="margin-left:1rem;color:var(--ink3)">Gris: sin postura suficiente</span><span style="margin-left:1rem;color:var(--ink3)"><b class="cam-ley">⚑</b> El Gobierno anunció que lo cambia</span></div>
       <div class="descargas"><a class="lleno" href="ley-rescate-data/word/articulado-completo.docx" download>↓ Los 106 artículos en Word</a><a id="pdf-of" href="#" target="_blank" rel="noopener">PDF oficial de la Cámara</a><small>El Word pesa 135 KB; el PDF oficial, 3 MB y 334 páginas.</small></div></div>
       <div id="ficha"></div>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261116"></script>
+  <script src="ley-rescate-base.js?v=20261118"></script>
   <script>
 LR.pagina('articulos', E => {
   const { $, esc, num, suma, MIN_POST } = LR, sin = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), mx = Math.max(...E.temas.filter(t => t.id !== 'general').map(t => suma(t, 'todo').n), 1);
@@ -36,9 +37,12 @@ LR.pagina('articulos', E => {
   function pinta() { const q = sin(($('#q').value || '').trim());
     $('#arts').innerHTML = E.articulos.map(a => { const ts = a.temas.map(id => E.temas.find(t => t.id === id)).filter(Boolean), t = ts[0], o = t ? suma(t, 'todo') : null, c = o ? tono(o) : null, fuera = q && !sin(a.n + ' ' + a.r + ' ' + ts.map(x => x.nombre + ' ' + x.corto).join(' ')).includes(q);
       const luz = c ? (.299 * c[0] + .587 * c[1] + .114 * c[2]) : 255, est = (c ? `background:rgb(${c.join(',')});color:${luz < 150 ? '#fff' : '#14161c'};` : '') + (!fuera && o ? `opacity:${(.5 + .5 * Math.min(1, Math.sqrt(o.n / mx))).toFixed(2)}` : '');
-      return `<a class="a ${fuera ? 'apag' : ''}${a.n === SEL ? ' sel' : ''}" style="${est}" href="#art=${a.n}" data-n="${a.n}" data-tip="${esc(`<b>Artículo ${a.n}</b> · p. ${a.pag}<br>${esc(a.r)}${t ? `<br><b>${esc(t.nombre)}</b>: ${num(o.n)} textos` : ''}`)}" aria-label="Artículo ${a.n}: ${esc(a.r)}">${a.n}</a>`; }).join(''); }
+      const cm = CAM(a.n);
+      return `<a class="a ${fuera ? 'apag' : ''}${a.n === SEL ? ' sel' : ''}${cm.length ? ' cam' : ''}" style="${est}" href="#art=${a.n}" data-n="${a.n}" data-tip="${esc(`<b>Artículo ${a.n}</b> · p. ${a.pag}<br>${esc(a.r)}${t ? `<br><b>${esc(t.nombre)}</b>: ${num(o.n)} textos` : ''}${cm.length ? `<br>⚑ ${esc(cm.map(c => c.que).join(' · '))}` : ''}`)}" aria-label="Artículo ${a.n}: ${esc(a.r)}">${a.n}</a>`; }).join(''); }
   // Texto de los artículos: se pide al abrir la página para que la ficha salga al instante. Sale de
   // tools/ley-rescate/build_texto_articulos.py; si no llega, la ficha ofrece el Word y el PDF igual.
+  // Cambios que el Gobierno anunció y todavía no están en el texto (proyecto.json → cambios[].an).
+  const CAM = n => (E.proyecto.cambios || []).filter(c => (c.an || []).includes(n));
   let SEL = null, TX = null;
   const txt = fetch('ley-rescate-data/texto-articulos.json').then(r => r.ok ? r.json() : null).then(d => (TX = d)).catch(() => null);
   $('#pdf-of').href = E.proyecto.pdf;
@@ -51,6 +55,7 @@ LR.pagina('articulos', E => {
     const ta = TX && TX.arts[n - 1], titulo = (ta && (ta.t || ta.d)) || a.r;
     $('#ficha').innerHTML = `<div class="ficha art-ficha" id="art-ficha"><button class="art-cerrar" aria-label="Cerrar">×</button><div class="art-k">Artículo ${n} de 106 · página ${a.pag} del proyecto</div><h3>${esc(titulo)}</h3>
       ${ts.length ? `<div class="chips">${ts.map(t => `<a class="chip" href="ley-de-rescate-discusion.html#tema=${t.id}">Cómo se discute: ${esc(t.nombre)} →</a>`).join('')}</div>` : ''}
+      ${CAM(n).map(c => `<p class="art-cam"><b>⚑ Anunciado el ${LR.corta(c.fecha)}, falta el texto:</b> ${esc(c.que)}. ${esc(c.detalle)} <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.fuente)}</a> · <a href="ley-de-rescate-avance.html#cambios-b">Todos los cambios anunciados</a></p>`).join('')}
       <div class="art-acc"><a class="lleno" href="ley-rescate-data/word/articulo-${num3}.docx" download>↓ Este artículo en Word</a><a href="${esc(E.proyecto.pdf)}#page=${a.pag}" target="_blank" rel="noopener">Verlo en el PDF oficial (3 MB)</a></div>
       <div id="art-cuerpo">${TX ? cuerpo() : LR.mar(['Trayendo el texto del artículo…', 'Ya casi…', 'Un momento más…'], true)}</div></div>`;
     $('#art-ficha .art-cerrar').onclick = () => { SEL = null; $('#ficha').innerHTML = ''; history.replaceState(null, '', location.pathname + location.search); pinta(); };

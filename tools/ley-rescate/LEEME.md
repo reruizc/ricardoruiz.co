@@ -7,8 +7,10 @@ Al tocar la base, subir el `?v=` en las ocho.
 ```
 temas.json          libro de códigos: 24 temas que agrupan los 106 artículos (nombre, artículos, página, nota)
 articulos.json      los 106 artículos con página y tema · lo genera build_articulos.py
-proyecto.json       ficha fija del proyecto. `ponentes_prensa`: ponentes que reporta la prensa mientras la ficha de la Cámara no los
-                    registre; el hub los muestra con su fuente y NO marca la etapa. Borrarlo cuando la ficha los traiga.
+proyecto.json       ficha fija del proyecto. `ponentes_senado`: los del Senado según la prensa (los de la Cámara salen de su ficha);
+                    `coordinadores_camara` · `coordinacion`; `primer_debate.previsto` (fecha que busca el Gobierno, la usan el hub y el
+                    reloj); `cambios`: lo anunciado que aún no está en el texto (tipo sale|queda|estudio, `an` = artículos que marca el
+                    mapa con ⚑). Al llegar la ponencia, los cambios que entren se borran de aquí y se rehacen temas, artículos y análisis.
 hitos.json          bitácora curada a mano. Un hito con "etapa":"pon|inf|anu|c1|p2|c3|p4|con|san" marca esa etapa como hecha
 verificaciones.json lo que dijo un actor contra el texto radicado (Tabla 14, p. 204). El hub pinta la más reciente
 voces.json          declaraciones verificadas una por una (p: a apoya · r rechaza · m reparos · i sin definir · g: con congreso · pub público · pri privado · n: nivel 5-2 del eje de poder · k: rótulo corto · al: nombres para contar menciones)
@@ -113,3 +115,13 @@ Orden: `ollama serve` · `prensa.py` · `gacetas.py` (~25 min) · `clasificar.py
   quién vota el primer debate (`aviso`). `build_personas.py` arma las cuatro plantillas desde la ficha de cada comisión
   del Senado y el `IdComision` de la Cámara, y aborta si no cuadra con `camaras[*].total`.
 - Al tocar `ley-rescate-base.css` o `.js`, subir el `?v=` en las 12 páginas.
+
+## Actualización del 18-nov-2026
+
+Lo curado a mano se había quedado en el 13-nov mientras el rastreo seguía. Se sumaron ponentes (18 en la ficha de la Cámara,
+16 del Senado según Semana; la prensa cuenta 31 y difiere en dos nombres de la Cámara: manda la ficha), el retiro del IVA a la
+canasta, insumos, prepagada y mascotas, la renta de empresas en 35 % y la votación prevista para el 1 o 2 de diciembre.
+- Los «27 billones» del hueco que reporta La Silla Vacía no dicen de qué años son: no se usan como cifra anual en «Cuadre la cuenta».
+- El análisis por hogares sigue calculado con el texto radicado (con IVA a la comida) y lo dice arriba; se rehace con la ponencia.
+- Regenerar sin gastar: bajar el artefacto (`gh run download <id> -n ley-rescate-estado -D <dir>`) y
+  `LR_DATOS=<dir> python3 tools/ley-rescate/rastreo.py --solo-calcular --publicar`.

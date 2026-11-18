@@ -33,6 +33,20 @@
   .vf-ley i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.3rem;vertical-align:-1px}
   .vf-ctx{margin-top:1rem;font-size:.86rem;line-height:1.55;color:var(--ink2);background:var(--teal-soft);border-radius:10px;padding:.8rem 1rem}
   .vf-f{margin-top:.7rem;font-size:.74rem;color:var(--ink3)}
+  .cambios{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.8rem}
+  .cambio{border:1px solid var(--line,#e3e6ea);border-radius:10px;padding:.85rem .95rem;background:var(--bg,#fff);display:flex;flex-direction:column;gap:.35rem}
+  .cambio .ce{font-size:.64rem;letter-spacing:.09em;text-transform:uppercase;font-weight:700}
+  .cambio .ce.sale{color:var(--apoya)} .cambio .ce.queda{color:#3d6eb8} .cambio .ce.estudio{color:#a87a1f}
+  .cambio h3{font-size:1.02rem;line-height:1.3;margin:0}
+  .cambio p{font-size:.84rem;line-height:1.5;color:var(--ink2);margin:0}
+  .cambio small{font-size:.72rem;color:var(--ink3);margin-top:auto}
+  .pon-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem 1.4rem}
+  .pon-c h4{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:0 0 .5rem}
+  .pon-c ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.4rem}
+  .pon-c li{display:flex;align-items:center;gap:.55rem;font-size:.86rem;line-height:1.25}
+  .pon-c li small{display:block;color:var(--ink3);font-size:.72rem}
+  .pon-c li .co{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--cauce,#0a7c86);margin-left:.25rem}
+  .pon-c .cara{width:34px;height:34px;flex:none}
   @media (max-width:760px){.vf-q{grid-template-columns:1fr}}
   </style>
 </head>
@@ -46,19 +60,26 @@
       <section class="bloque"><div class="k">Termómetro de medios y redes</div><h2>¿Qué tan caliente está la discusión?</h2><p class="sub">Entre los textos que toman postura, cuánto rechazo hay. Cada texto cuenta una vez, aunque toque varios temas, y los reparos cuentan como medio rechazo.</p>
         <div class="panel termo-p"><div class="termos" id="termos"></div><div><div id="lect"></div><h4 class="mini-t">Cómo ha cambiado por día</h4><div class="termo-dias" id="tdias"></div></div></div></section>
       <section class="bloque"><div class="k">En una línea</div><div class="panel"><div id="puntos" class="puntos4"></div></div></section>
+      <section class="bloque" id="cambios-b" hidden><div class="k">Lo que ya se movió</div><h2>Lo anunciado que todavía no está en el texto</h2><p class="sub">Cambios que el Gobierno anunció o acordó con el Congreso después de radicar el proyecto. <b>Ninguno está escrito todavía</b>: entran cuando los ponentes radiquen su ponencia, que es el texto que se vota. Hasta entonces, el proyecto vigente es el radicado.</p><div class="panel"><div class="cambios" id="cambios"></div><p class="vf-f" id="cambios-f"></p></div></section>
+      <section class="bloque" id="ponentes" hidden><div class="k">Quién escribe la ponencia</div><h2>Los ponentes</h2><p class="sub" id="pon-sub"></p><div class="panel"><div class="pon-g" id="pon"></div></div></section>
       <section class="bloque" id="verif-b" hidden><div class="k">Verificación</div><h2>Lo que se dijo y lo que dice el proyecto</h2><p class="sub">Una frase de la discusión contrastada con el texto radicado. Las cifras del proyecto son las de su propia tabla de impacto fiscal (p. 204), en % del PIB.</p><div class="panel" id="verif"></div></section>
       <section class="bloque"><div class="k">El camino</div><h2>En qué etapa va</h2><p class="sub">Una ley necesita cuatro debates. Toque cada etapa para ver qué pasa ahí y qué norma la exige.</p><div class="panel"><div class="ruta" id="etapas" style="margin-top:0"></div><div class="etinfo" id="etinfo"></div></div></section>
       <section class="bloque"><div class="k">Para entrar más</div><h2>Todo el seguimiento</h2><div class="lr-cards" id="cards"></div></section>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261116"></script>
+  <script src="ley-rescate-base.js?v=20261118"></script>
   <script>
 LR.pagina('hub', E => {
-  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia, PP = E.proyecto.ponentes_prensa, ppn = PP ? PP.lista.length : 0;
+  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia;
+  // Ponentes: los de la Cámara salen de su ficha oficial; los del Senado, de la prensa mientras su registro no los publique.
+  const PS = E.proyecto.ponentes_senado, psn = PS ? PS.lista.length : 0, PD = E.proyecto.primer_debate, CA = E.proyecto.cambios || [];
+  const vota = PD && PD.previsto >= E.hoy ? PD : null, sesion = a => /conjunt/i.test(a.titulo || '') ? 'Sesión conjunta de las comisiones económicas' : a.ambito;
   const K = [['Dónde está', T.estado || 'Sin dato', `Sigue: ${ahora ? ahora.nom.toLowerCase() : 'sancionada'}${U ? ' · con mensaje de urgencia' : ''}`, ''],
-    ['Próxima votación', ag.length ? larga(ag[0].fecha) : 'Sin fecha', ag.length ? esc(ag[0].ambito) : 'No aparece en ningún orden del día publicado hasta el ' + corta((T.ordenes_hasta || E.hoy).slice(0, 10)), ag.length ? '' : 'alerta'],
-    ['Ponentes', pon.length ? String(pon.length) : ppn ? `${ppn} ${PP.donde}` : 'Sin publicar', pon.length ? esc(pon.slice(0, 2).join(' · ')) : ppn ? `${PP.lista.map(x => `${esc(x.n)} (${esc(x.p)})`).join(' y ')}, según <a href="${esc(PP.url)}" target="_blank" rel="noopener">${esc(PP.fuente)}</a>. ${esc(PP.falta)}` : 'La ficha oficial todavía no los trae', ''],
+    ag.length ? ['Próxima sesión', larga(ag[0].fecha), esc(sesion(ag[0])) + (vota ? `. Votación prevista: ${larga(vota.previsto)}, según ${vota.fuentes.map(f => `<a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.n)}</a>`).join(' y ')}` : ''), '']
+      : vota ? ['Votación prevista', larga(vota.previsto), `${esc(vota.texto)} Todavía no está en un orden del día: ${vota.fuentes.map(f => `<a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.n)}</a>`).join(' · ')}.`, '']
+      : ['Próxima votación', 'Sin fecha', 'No aparece en ningún orden del día publicado hasta el ' + corta((T.ordenes_hasta || E.hoy).slice(0, 10)), 'alerta'],
+    ['Ponentes', pon.length + psn ? String(pon.length + psn) : 'Sin publicar', pon.length + psn ? `${pon.length ? `${pon.length} en la Cámara, según su ficha oficial` : 'La ficha de la Cámara aún no los trae'}${psn ? ` · ${psn} en el Senado, según <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>` : ''}. <a href="#ponentes">Ver quiénes</a>` : 'La ficha oficial todavía no los trae', ''],
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
   $('#kpis').innerHTML = K.map(([l, v, d, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${esc(v)}</div><div class="d">${d}</div></div>`).join('');
   const TT = E.termometro || {}, idx = o => { const p = (o.a || 0) + (o.r || 0) + (o.m || 0); return p ? Math.round(100 * ((o.r || 0) + (o.m || 0) / 2) / p) : null; };
@@ -87,11 +108,31 @@ LR.pagina('hub', E => {
   const temas = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, 'todo') })), top = [...temas].sort((a, b) => b.o.n - a.o.n)[0];
   const apoy = temas.filter(x => x.o.post >= 20).sort((a, b) => b.o.apoya / b.o.post - a.o.apoya / a.o.post)[0];
   const rNorm = dias(E.hoy, ULT.normal), rUrg = dias(E.hoy, ULT.urgencia);
-  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length ? 'Ya tiene ponentes.' : ppn ? `${PP.lista.map(x => esc(x.n)).join(' y ')} son ponentes en el Senado desde el ${corta(PP.fecha)}; ${esc(PP.falta_corta)}.` : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : 'Sin fecha de votación.'}`],
+  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length + psn ? `Tiene ${pon.length + psn} ponentes de varios partidos en las cuatro comisiones económicas.` : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : ''} ${vota ? `Hacienda espera que se vote el ${larga(vota.previsto)}.` : ag.length ? '' : 'Sin fecha de votación.'}`],
     ['Reloj', U ? `El Gobierno radicó <b>mensaje de urgencia</b> el ${corta(U.fecha)}: las comisiones económicas de Cámara y Senado la estudian juntas y quedan <b>${Math.max(rUrg, 0)} días</b> para que el primer debate alcance antes del 16 de diciembre. La Constitución les pide decidir en 30 días.` : rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
-    ['Votos', `${CS.length > 2 ? 'Si votan las cuatro comisiones económicas, la ley necesita mayoría en cada una. ' : ''}Declarados en contra: ${y(CS.map(c => `${cuenta(c, 'no')} de ${camaras[c].total} en la ${NOMC[c]}`))}. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${y(CS.map(c => `${tSi(c)} de ${camaras[c].total} (hacen falta ${camaras[c].mayoria})`))}.`],
+    ['Votos', `${CS.length > 2 ? 'Votan las cuatro comisiones económicas y la ley necesita mayoría en cada una. ' : ''}Declarados en contra: ${y(CS.map(c => `${cuenta(c, 'no')} de ${camaras[c].total} en la ${NOMC[c]}`))}. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${y(CS.map(c => `${tSi(c)} de ${camaras[c].total} (hacen falta ${camaras[c].mayoria})`))}.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]
     .map(([a, b]) => `<div class="punto"><b>${a}</b><span>${b}</span></div>`).join('');
+  if (CA.length) {
+    const EST = { sale: 'Sale del proyecto', queda: 'Se queda como está hoy', estudio: 'En estudio' };
+    $('#cambios').innerHTML = CA.map(c => `<div class="cambio"><div class="ce ${esc(c.tipo)}">${EST[c.tipo] || esc(c.tipo)} · ${corta(c.fecha)}</div><h3>${esc(c.que)}</h3><p>${esc(c.detalle)}</p><small>Radicado: ${esc(c.radicado)}${c.arts ? ` (${esc(c.arts)})` : ''} · <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.fuente)}</a></small></div>`).join('');
+    $('#cambios-f').innerHTML = esc(E.proyecto.cambios_nota || '');
+    $('#cambios-b').hidden = false;
+  }
+  // Ponentes por comisión, con foto y partido. La comisión de cada representante sale de las plantillas de votos.json.
+  if (pon.length || psn) {
+    const slug = n => n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const dondeEs = {}; for (const b of E.votos.bloques) for (const [c, l] of Object.entries(b.plantilla || {})) for (const s of l) dondeEs[s] = [c, b.nombre];
+    const coord = new Set((E.proyecto.coordinadores_camara || []).map(slug));
+    const G = { camara: [], camara4: [], senado: [], senado4: [] };
+    for (const n of pon) { const s = slug(n), [c, b] = dondeEs[s] || ['camara', '']; (G[c] || G.camara).push({ n, s, b, co: coord.has(s) }); }
+    for (const x of (PS ? PS.lista : [])) { const s = x.s || slug(x.n); (G[x.c] || G.senado).push({ n: x.n, s, b: x.p, co: !!x.coord }); }
+    const NC = { camara: 'Tercera de la Cámara', camara4: 'Cuarta de la Cámara', senado: 'Tercera del Senado', senado4: 'Cuarta del Senado' };
+    $('#pon').innerHTML = Object.entries(G).filter(([, l]) => l.length).map(([c, l]) => `<div class="pon-c"><h4>${NC[c]} · ${l.length}</h4><ul>${l.sort((a, b) => b.co - a.co).map(m => `<li>${cara(E, m.s, m.n)}<span>${esc(m.n)}${m.co ? '<span class="co">coordinador</span>' : ''}<small>${esc(m.b)}</small></span></li>`).join('')}</ul></div>`).join('');
+    const pb = [...pon.map(n => (dondeEs[slug(n)] || [])[1]), ...(PS ? PS.lista.map(x => x.p) : [])].filter(Boolean), np = new Set(pb).size;
+    $('#pon-sub').innerHTML = `${pon.length + psn} congresistas de ${np} bancadas, ${E.proyecto.coordinacion ? `con ${esc(E.proyecto.coordinacion)}` : 'con coordinadores en cada comisión'}. Los de la Cámara salen de su <a href="${esc(E.proyecto.ficha)}" target="_blank" rel="noopener">ficha oficial</a>${psn ? `; los del Senado, de <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>, porque el registro del Senado aún no los publica` : ''}.`;
+    $('#ponentes').hidden = false;
+  }
   const VF = (E.verificaciones || []).slice(-1)[0];
   if (VF) {
     const tot = VF.anios.map((_, i) => VF.componentes.reduce((a, c) => a + c.v[i], 0)), top = 1.2, COL = ['#3d6eb8', '#c8553d', '#d9a441'], pc = x => String(x.toFixed(2)).replace('.', ',');
@@ -129,7 +170,7 @@ LR.pagina('hub', E => {
   const HH = E.historico || {}, HT = (HH.reformas || []).flatMap(r => r.temas), HV = HT.filter(t => t.r === 'aprobado' || t.r === 'recortado').length;
   if (HT.length) C.splice(1, 0, ['ley-de-rescate-historico.html', 'imagenes/caudal-congreso.jpg', 'Entran y salen', `${Math.round(100 * HV / HT.length)}% de lo propuesto sobrevive`, `Qué propusieron las ${HH.reformas.length} tributarias anteriores y qué quedó en la ley, tema por tema.`, 'Ver qué sobrevive', 'w2']);
   const AN = E.analisis || {};
-  C.splice(1, 0, ['ley-de-rescate-cuadra.html', 'imagenes/caudal-datos.jpg', 'Cuadre la cuenta', 'Sin IVA a la comida', 'El Presidente sacó la comida del IVA. Escoja usted de dónde sale esa plata y vea quién la pone.', 'Hacer la cuenta', 'w2']);
+  C.splice(1, 0, ['ley-de-rescate-cuadra.html', 'imagenes/caudal-datos.jpg', 'Cuadre la cuenta', 'Sin IVA a la comida ni a la prepagada', 'El Gobierno sacó la comida, la prepagada y la comida de mascotas del IVA, y dejó la renta de las empresas en 35%. Escoja usted de dónde sale el resto.', 'Hacer la cuenta', 'w2']);
   if (AN.propia) C.splice(2, 0, ['ley-de-rescate-analisis.html', 'imagenes/caudal-regulatorio.jpg', 'Quién gana y quién pierde', `${Number(AN.propia.neto[9]).toFixed(1).replace('.', ',').replace('-', '−')}% el 10% que más gasta`, 'Doce gráficas: por qué el Gobierno pide la plata, quién la pone y cuánto le cuesta a cada hogar. Cálculo propio.', 'Ver el análisis', 'w2']);
   $('#cards').innerHTML = C.map(([h, img, t, g, d, f, w], i) => `<a class="lr-card ${w || ''}" href="${h}"><div class="lr-card-img" style="background-image:url('${img}')"><div class="lr-card-t"><div class="n">${String(i + 1).padStart(2, '0')}</div><div class="h">${t}</div></div></div><div class="lr-card-b"><div class="g">${g}</div><p>${d}</p></div><div class="lr-card-f"><span>${f}</span><span>↗</span></div></a>`).join('');
 });
