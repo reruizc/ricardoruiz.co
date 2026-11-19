@@ -264,10 +264,12 @@
     .pf-key{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin-top:.3rem;font-size:.62rem;color:rgba(255,255,255,.5)}
     .pf-key i{display:inline-block;width:9px;height:9px;margin-right:.35rem;vertical-align:middle}
     .pf-note{font-size:.6rem;letter-spacing:.03em;color:rgba(255,255,255,.35);line-height:1.6;margin-top:1rem}
-    #perfil-card.pf-lock .pf-body{filter:blur(7px);pointer-events:none;-webkit-user-select:none;user-select:none}
-    .pf-cta{display:none;position:absolute;inset:2.4rem 0 0 0;align-items:center;justify-content:center;z-index:3}
-    #perfil-card.pf-lock .pf-cta{display:flex}
-    .pf-cta-box{background:rgba(6,8,16,.92);border:1px solid rgba(0,71,255,.45);padding:1.1rem 1.4rem;text-align:center;max-width:380px}
+    /* sexo con Pro, edad con Premium: cada columna lleva su candado */
+    .pf-col{position:relative}
+    .pf-col.lock .pf-colbody{filter:blur(7px);pointer-events:none;-webkit-user-select:none;user-select:none}
+    .pf-cta{display:none;position:absolute;inset:1.2rem 0 0 0;align-items:center;justify-content:center;z-index:3}
+    .pf-col.lock .pf-cta{display:flex}
+    .pf-cta-box{background:rgba(6,8,16,.92);border:1px solid rgba(0,71,255,.45);padding:.9rem 1.1rem;text-align:center;max-width:320px}
     .pf-cta-box b{display:block;font-size:.95rem;color:var(--white);margin-bottom:.35rem;font-weight:500}
     .pf-cta-box span{display:block;font-size:.72rem;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:.8rem}
     @media(max-width:760px){.pf-grid{grid-template-columns:1fr}.pf-row{grid-template-columns:5.6rem 1fr}.pf-seg{font-size:.62rem}}
@@ -560,12 +562,11 @@
           </div>
         </div>
 
-        <div class="card pf-lock" id="perfil-card" style="display:none">
+        <div class="card" id="perfil-card" style="display:none">
           <div class="table-header">
             <div class="card-label" id="pf-label">Quién vota · sexo y edad</div>
           </div>
           <div class="pf-body" id="pf-body"></div>
-          <div class="pf-cta"><div class="pf-cta-box"><b>Sexo y edad de cada territorio</b><span>Disponible en plan Pro: qué parte del electorado y de quienes votaron son mujeres, hombres, jóvenes, adultos y mayores, hasta el puesto de votación.</span><a class="endoso-btn" href="pricing.html">Ver planes →</a></div></div>
         </div>
         <div class="results-grid" id="main-grid">
           <!-- IZQUIERDA · datos generales primero, luego ranking territorial -->
@@ -1822,7 +1823,8 @@
     }
     if (!s || !(s[0] + s[1])){ card.style.display = 'none'; return; }
     card.style.display = '';
-    card.classList.toggle('pf-lock', !_planDescarga());
+    const niv = _planNivel();
+    const cta = (tit, txt) => `<div class="pf-cta"><div class="pf-cta-box"><b>${tit}</b><span>${txt}</span><a class="endoso-btn" href="pricing.html">Ver planes →</a></div></div>`;
     const terr = nombreTerritorio() + (currentZon ? ` · ${nombreUnidad(currentZon)}` : '') + (currentPue ? ` · ${rotuloPuesto(currentPue).toLowerCase()}` : '');
     document.getElementById('pf-label').textContent = `Quién vota · sexo y edad · ${terr}`;
     const pc = (a, t) => t ? a / t * 100 : 0;
@@ -1836,14 +1838,14 @@
     const hayVot = s[10] > 0 && (s[5] + s[6]) > 0;
     const fila = (lbl, sub, vals, pal) => `<div class="pf-row"><div class="pf-lbl">${lbl}<small>${sub}</small></div>${barra(vals, pal)}</div>`;
     document.getElementById('pf-body').innerHTML = `<div class="pf-grid">
-        <div><div class="pf-tit">Sexo</div>
+        <div class="pf-col${niv < 1 ? ' lock' : ''}"><div class="pf-colbody"><div class="pf-tit">Sexo</div>
           ${fila('Electorado', fmtN(s[0] + s[1]) + ' en el censo', [s[0], s[1]], SEX)}
           ${hayVot ? fila('Votaron', fmtN(s[10]) + ' · estimado', [s[5], s[6]], SEX) : ''}
-          ${llave(SEX)}</div>
-        <div><div class="pf-tit">Edad</div>
+          ${llave(SEX)}</div>${niv < 1 ? cta('Sexo de cada territorio', 'Con el plan Pro ves qué parte del electorado y de quienes votaron son mujeres y hombres, hasta el puesto de votación.') : ''}</div>
+        <div class="pf-col${niv < 2 ? ' lock' : ''}"><div class="pf-colbody"><div class="pf-tit">Edad</div>
           ${fila('Electorado', 'censo de 2023', [s[2], s[3], s[4]], AGE)}
           ${hayVot ? fila('Votaron', 'estimado', [s[7], s[8], s[9]], AGE) : ''}
-          ${llave(AGE)}</div>
+          ${llave(AGE)}</div>${niv < 2 ? cta('Edad de cada territorio', 'Con el plan Premium ves qué parte del electorado y de quienes votaron son jóvenes, adultos y mayores, hasta el puesto de votación.') : ''}</div>
       </div>
       <div class="pf-note">Electorado: censo electoral de 2023 por puesto (Registraduría), dato exacto. Votaron: estimación por inferencia ecológica. La Registraduría no publica quién votó en 2023 por edad y sexo; tomamos cuánto votó cada grupo en ese mismo puesto en 2019 (sufragantes mesa a mesa) y lo ajustamos a los votantes reales de 2023. Donde el puesto cambió entre elecciones se usa su zona o su municipio. Margen típico de ±2 a 4 puntos; en un puesto suelto, más. Las personas sin fecha de nacimiento en el censo no entran en la edad.</div>`;
   }
@@ -1856,10 +1858,17 @@
     let user = null; try { user = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch(e){}
     return !!(token && user && ['pro','premium','full'].includes(user.plan));
   }
+  // 0 sin plan · 1 Pro (ve sexo) · 2 Premium o full (ve sexo y edad)
+  function _planNivel(){
+    if (!localStorage.getItem('rr-token')) return 0;
+    let u = null; try { u = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch(e){}
+    const p = u && u.plan;
+    return (p === 'premium' || p === 'full') ? 2 : (p === 'pro' ? 1 : 0);
+  }
   function updateExcelDownloadBtn(){
     document.querySelectorAll('.js-excel').forEach(btn => { btn.className = 'excel-btn js-excel ' + (_planDescarga() ? 'excel-btn-active' : 'excel-btn-locked'); });
     document.body.classList.toggle('no-copy', !_planDescarga());
-    const pf = document.getElementById('perfil-card'); if (pf) pf.classList.toggle('pf-lock', !_planDescarga());
+    const pf = document.getElementById('perfil-card'); if (pf && pf.style.display !== 'none') renderPerfil();
   }
   // ─── Protección de copia (como senado-2026) ───
   // Copiar la tabla sería un atajo a «Descargar este listado», así que solo copia quien puede descargar.
