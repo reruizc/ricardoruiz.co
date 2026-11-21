@@ -48,6 +48,18 @@ with open(os.path.join(_HERE, "stopwords-es.txt"), encoding="utf-8") as _f:
         if line.strip() and not line.lstrip().startswith("#")
     }
 
+# Ruido geográfico extra por despliegue (coma-separado). La versión nacional
+# suma bogotá, cali, valle… que en esa cobertura no aportan.
+STOPWORDS |= {
+    w.strip().lower()
+    for w in os.environ.get("AGENDA_STOPWORDS_EXTRA", "").split(",")
+    if w.strip()
+}
+
+# AGENDA_POR_CIUDAD=1 → además del agregado general, escribe los mismos
+# archivos por ciudad en agregados/{ciudad}/ (usa el campo "ciudad" del evento).
+POR_CIUDAD = os.environ.get("AGENDA_POR_CIUDAD", "") == "1"
+
 # Letras ES (con tildes y ñ). Tokens = secuencias de letras.
 TOKEN_RE = re.compile(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+")
 
@@ -117,6 +129,7 @@ def read_events(s3, keys, cutoff_iso):
     """Lee y filtra eventos cuyo fecha_pub (o fecha_capturada como fallback)
     sea >= cutoff_iso. Deduplica por id."""
     seen_ids = set()
+    by_id = {}
     out = []
     for key in keys:
         try:
@@ -135,9 +148,20 @@ def read_events(s3, keys, cutoff_iso):
             if ts < cutoff_iso:
                 continue
             eid = ev.get("id")
-            if not eid or eid in seen_ids:
+            if not eid:
+                continue
+            ciudad = ev.get("ciudad")
+            if eid in seen_ids:
+                # La misma nota puede venir por el feed nacional y el de la
+                # ciudad: se cuenta una vez pero queda en las dos ciudades.
+                previas = by_id[eid].setdefault("ciudades", [])
+                if ciudad and ciudad not in previas:
+                    previas.append(ciudad)
                 continue
             seen_ids.add(eid)
+            if ciudad:
+                ev["ciudades"] = [ciudad]
+            by_id[eid] = ev
             out.append(ev)
     return out
 
@@ -274,25 +298,10 @@ def write_json(s3, name, body):
     return key
 
 
-def run():
-    s3 = _s3_client()
-    now = datetime.now(timezone.utc)
+def escribir_ventanas(s3, all_events, enriched_idx, now, sub, out_paths):
+    """Escribe nube/medios/titulares/actores/temas de las 3 ventanas bajo
+    agregados/{sub} (sub vacío = agregado general)."""
     summary = {}
-
-    # Días candidatos para listar S3: hoy + 5 hacia atrás (cubre 5d).
-    today = now.date()
-    days = [today - timedelta(days=i) for i in range(6)]
-    raw_keys = list_jsonl_for_days(s3, days, RAW_PREFIX)
-    enriched_keys = list_jsonl_for_days(s3, days, ENRICHED_PREFIX)
-    print(f"[run] {len(raw_keys)} archivos raw, {len(enriched_keys)} enriched en {len(days)} días")
-
-    # Leer una sola vez todo lo que cae dentro de la ventana 5d
-    cutoff_5d_iso = (now - WINDOWS["5d"]).isoformat()
-    all_events = read_events(s3, raw_keys, cutoff_5d_iso)
-    enriched_idx = read_enriched_index(s3, enriched_keys)
-    print(f"[run] {len(all_events)} eventos únicos en últimos 5d, {len(enriched_idx)} con enriquecimiento")
-
-    out_paths = []
     for win, delta in WINDOWS.items():
         cutoff_iso = (now - delta).isoformat()
         events = [
@@ -337,11 +346,11 @@ def run():
             "sentimientos": temas_data["sentimientos"],
         }
 
-        out_paths.append(write_json(s3, f"nube-{win}.json", nube))
-        out_paths.append(write_json(s3, f"medios-{win}.json", medios))
-        out_paths.append(write_json(s3, f"titulares-{win}.json", titulares))
-        out_paths.append(write_json(s3, f"actores-{win}.json", actores))
-        out_paths.append(write_json(s3, f"temas-{win}.json", temas))
+        out_paths.append(write_json(s3, f"{sub}nube-{win}.json", nube))
+        out_paths.append(write_json(s3, f"{sub}medios-{win}.json", medios))
+        out_paths.append(write_json(s3, f"{sub}titulares-{win}.json", titulares))
+        out_paths.append(write_json(s3, f"{sub}actores-{win}.json", actores))
+        out_paths.append(write_json(s3, f"{sub}temas-{win}.json", temas))
         summary[win] = {
             "eventos": n_eventos,
             "palabras": len(nube["palabras"]),
@@ -349,7 +358,35 @@ def run():
             "temas": len(temas_data["items"]),
             "enriquecidos": temas_data["n_enriquecidos"],
         }
-        print(f"[{win}] eventos={n_eventos} top_words={len(nube['palabras'])} actores={len(actores_data)} temas={len(temas_data['items'])} enriquecidos={temas_data['n_enriquecidos']}")
+        print(f"[{sub or 'general/'}{win}] eventos={n_eventos} top_words={len(nube['palabras'])} actores={len(actores_data)} temas={len(temas_data['items'])} enriquecidos={temas_data['n_enriquecidos']}")
+    return summary
+
+
+def run():
+    s3 = _s3_client()
+    now = datetime.now(timezone.utc)
+    summary = {}
+
+    # Días candidatos para listar S3: hoy + 5 hacia atrás (cubre 5d).
+    today = now.date()
+    days = [today - timedelta(days=i) for i in range(6)]
+    raw_keys = list_jsonl_for_days(s3, days, RAW_PREFIX)
+    enriched_keys = list_jsonl_for_days(s3, days, ENRICHED_PREFIX)
+    print(f"[run] {len(raw_keys)} archivos raw, {len(enriched_keys)} enriched en {len(days)} días")
+
+    # Leer una sola vez todo lo que cae dentro de la ventana 5d
+    cutoff_5d_iso = (now - WINDOWS["5d"]).isoformat()
+    all_events = read_events(s3, raw_keys, cutoff_5d_iso)
+    enriched_idx = read_enriched_index(s3, enriched_keys)
+    print(f"[run] {len(all_events)} eventos únicos en últimos 5d, {len(enriched_idx)} con enriquecimiento")
+
+    out_paths = []
+    summary["general"] = escribir_ventanas(s3, all_events, enriched_idx, now, "", out_paths)
+    if POR_CIUDAD:
+        ciudades = sorted({c for e in all_events for c in e.get("ciudades", [])})
+        for c in ciudades:
+            evs = [e for e in all_events if c in e.get("ciudades", [])]
+            summary[c] = escribir_ventanas(s3, evs, enriched_idx, now, f"{c}/", out_paths)
 
     return {
         "generado_en": now.isoformat(),

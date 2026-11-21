@@ -63,10 +63,22 @@ MAX_SEEN_PER_FEED = 600  # IDs retenidos por feed en el state file
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 DC_NS = "{http://purl.org/dc/elements/1.1/}"
 CONTENT_NS = "{http://purl.org/rss/1.0/modules/content/}"
+SM_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+NEWS_NS = "{http://www.google.com/schemas/sitemap-news/0.9}"
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_HERE, "feeds.json"), encoding="utf-8") as _f:
+# AGENDA_FEEDS_FILE permite desplegar el mismo código con otra lista de medios
+# (p. ej. feeds-nacional.json para Bogotá · Medellín · Cali). Default: feeds.json.
+FEEDS_FILE = os.environ.get("AGENDA_FEEDS_FILE", "feeds.json")
+with open(os.path.join(_HERE, FEEDS_FILE), encoding="utf-8") as _f:
     FEEDS = json.load(_f)
+
+# Si se define, al terminar invoca (asíncrono) esa función — sirve para
+# encadenar el agregador cuando no hay programación propia para él.
+# AGENDA_ENCADENAR_CADA = cada cuántos minutos (default 60: sólo en la corrida
+# de la primera media hora de cada hora).
+ENCADENAR = os.environ.get("AGENDA_ENCADENAR", "").strip()
+ENCADENAR_CADA = int(os.environ.get("AGENDA_ENCADENAR_CADA", "60"))
 
 # boto3 sólo se importa cuando vamos a tocar S3 (no en --dry-run)
 _s3 = None
@@ -206,8 +218,35 @@ def _parse_atom(root):
         })
     return out
 
+def _parse_news_sitemap(root):
+    """Mapa de noticias del sitio (formato Google News): cada <url> trae
+    loc + news:title + news:publication_date. Sin resumen."""
+    out = []
+    for u in root.findall(SM_NS + "url"):
+        loc = (u.findtext(SM_NS + "loc") or "").strip()
+        news = u.find(NEWS_NS + "news")
+        if not loc or news is None:
+            continue
+        title = (news.findtext(NEWS_NS + "title") or "").strip()
+        if not title:
+            continue
+        kw = news.findtext(NEWS_NS + "keywords") or ""
+        out.append({
+            "link": loc,
+            "title": title,
+            "desc": "",
+            "fecha_pub": parse_date(news.findtext(NEWS_NS + "publication_date")
+                                    or u.findtext(SM_NS + "lastmod")),
+            "autor": None,
+            "categorias": [k.strip() for k in kw.split(",") if k.strip()],
+            "raw_id": loc,
+        })
+    return out
+
 def parse_feed(xml_bytes: bytes):
     root = ET.fromstring(xml_bytes)
+    if root.tag == SM_NS + "urlset":
+        return _parse_news_sitemap(root)
     if root.tag.lower() == "rss":
         ch = root.find("channel")
         if ch is not None:
@@ -276,7 +315,21 @@ def process_feed(cfg, prev_seen, run_iso, run_id):
         print(f"[{medio}] FAIL fetch/parse: {error}")
         items = []
 
+    # Opcionales del feed (lista nacional):
+    #   excluir_url     → secciones que no son agenda (loterías, recetas…)
+    #   ciudad_por_url  → {"/bogota/": "bogota"}: medio nacional que publica
+    #                     una sección por ciudad
+    #   sufijo_titulo   → texto a quitar del final del título (Google News
+    #                     pega " - Medio" y ensuciaría la nube de palabras)
+    excluir = cfg.get("excluir_url") or []
+    por_url = cfg.get("ciudad_por_url") or {}
+    sufijo = cfg.get("sufijo_titulo") or ""
+
     for it in items:
+        if any(x in it["link"] for x in excluir):
+            continue
+        if sufijo and it["title"].lower().endswith(sufijo.lower()):
+            it["title"] = it["title"][: -len(sufijo)].strip()
         canon = canonical_url(it["link"])
         eid = hash_id(canon)
         if eid in seen_set:
@@ -296,6 +349,14 @@ def process_feed(cfg, prev_seen, run_iso, run_id):
             "raw_id": it["raw_id"],
             "run_id": run_id,
         })
+        # Campos opcionales del feed (lista nacional): ciudad y tipo de fuente.
+        for extra in ("ciudad", "tipo"):
+            if cfg.get(extra):
+                new_events[-1][extra] = cfg[extra]
+        for patron, ciudad in por_url.items():
+            if patron in it["link"]:
+                new_events[-1]["ciudad"] = ciudad
+                break
         seen.append(eid)
         seen_set.add(eid)
 
@@ -386,12 +447,33 @@ def run(local_dir=None, dry_run=False):
     paths = write_outputs(all_new, run_id, now, local_dir=local_dir)
     save_state(state, local_dir=local_dir)
     print(f"[run {run_id}] total={len(all_new)} per_medio={summary}")
+    encadenado = _encadenar(now)
     return {
+        "encadenado": encadenado,
         "run_id": run_id,
         "total": len(all_new),
         "per_medio": summary,
         "paths": paths,
     }
+
+
+def _encadenar(now):
+    """Invoca el agregador (asíncrono) si AGENDA_ENCADENAR está definido.
+    Nunca tumba la corrida: un fallo aquí sólo se registra."""
+    if not ENCADENAR:
+        return None
+    minuto_del_dia = now.hour * 60 + now.minute
+    if minuto_del_dia % ENCADENAR_CADA >= 30:
+        return None
+    try:
+        import boto3
+        boto3.client("lambda").invoke(
+            FunctionName=ENCADENAR, InvocationType="Event", Payload=b"{}")
+        print(f"[encadenar] invocado {ENCADENAR}")
+        return ENCADENAR
+    except Exception as e:
+        print(f"[encadenar] FAIL {ENCADENAR}: {type(e).__name__}: {e}")
+        return None
 
 
 # ---- Lambda entry ----
