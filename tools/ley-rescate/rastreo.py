@@ -124,8 +124,11 @@ def tramite(previo):
         nuevo = {'estado': f.get('estado_ficha'), 'comision': f.get('comision') or None,
                  'nro_senado': f.get('nro_senado'), 'debates': f.get('debates') or []}
         if {k: t.get(k) for k in nuevo} != nuevo and t.get('estado'):
+            # Si el estado no cambió, lo nuevo suele ser una publicación (proposiciones, audiencia, ponencia): se guarda cuál.
+            viejas = {p.get('texto') for d in t.get('debates') or [] for p in d.get('publicaciones') or []}
+            pubs = [p.get('texto') for d in nuevo['debates'] for p in d.get('publicaciones') or [] if p.get('texto') not in viejas]
             t.setdefault('cambios', []).append({'fecha': ahora().astimezone(COL).date().isoformat(),
-                                                'antes': t.get('estado'), 'ahora': nuevo['estado']})
+                                                'antes': t.get('estado'), 'ahora': nuevo['estado'], 'pub': pubs[:6]})
         t.update(nuevo)
         t['ficha_leida'] = ahora().isoformat(timespec='minutes')
     try:

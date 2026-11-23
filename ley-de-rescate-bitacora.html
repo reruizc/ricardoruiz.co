@@ -31,7 +31,7 @@
   <script>
 LR.pagina('bitacora', E => {
   const { $, esc, corta, FN, MIN_POST } = LR, L = [...(E.hitos || [])], T = E.tramite || {}, red = ['x', 'tiktok', 'instagram', 'facebook'].filter(f => E.fuentes[f]?.n);
-  for (const c of T.cambios || []) L.push({ fecha: c.fecha, t: `La ficha oficial cambió de «${c.antes}» a «${c.ahora}».`, fuente: 'Ficha de la Cámara', url: E.proyecto.ficha });
+  for (const c of T.cambios || []) { const t = c.antes !== c.ahora ? `La ficha oficial cambió de «${c.antes}» a «${c.ahora}».` : (c.pub || []).length ? `La ficha oficial publicó: ${c.pub.map(p => p.split(':')[0]).join(' · ')}.` : ''; if (t) L.push({ fecha: c.fecha, t, fuente: 'Ficha de la Cámara', url: E.proyecto.ficha }); }
   for (const s of E.lectura?.senales || []) L.push({ fecha: E.lectura.fecha, t: s.texto, fuente: 'Detectado en prensa, sin verificar' });
   L.sort((a, b) => b.fecha.localeCompare(a.fecha));
   $('#bit').innerHTML = L.map(h => `<div><b>${corta(h.fecha)}</b><span>${esc(h.t)} ${h.url ? `<a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.fuente)}</a>` : `<small>${esc(h.fuente)}</small>`}</span></div>`).join('');

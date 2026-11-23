@@ -125,3 +125,15 @@ canasta, insumos, prepagada y mascotas, la renta de empresas en 35 % y la votaci
 - El análisis por hogares sigue calculado con el texto radicado (con IVA a la comida) y lo dice arriba; se rehace con la ponencia.
 - Regenerar sin gastar: bajar el artefacto (`gh run download <id> -n ley-rescate-estado -D <dir>`) y
   `LR_DATOS=<dir> python3 tools/ley-rescate/rastreo.py --solo-calcular --publicar`.
+
+## Actualización del 23-nov-2026
+
+- La corrida del 23 falló en el `git pull --rebase`: otra sesión había commiteado `estado.json` con las voces de la audiencia.
+  Se regeneró a mano con el artefacto de esa corrida (`--solo-calcular`). Si vuelve a pasar, mismo procedimiento.
+- Hitos del 18 al 30-nov verificados en la nota original. **La ponencia no está radicada al 23-nov** (un titular de El Nuevo Siglo
+  dijo que sí): Ape Cuello espera anunciarla el 30-nov y votar el 1 y 2 de diciembre.
+- ⚠ Desde el 19-nov **la ficha de la Cámara trae también a los ponentes del Senado** (35 en total). El hub sumaba la lista de
+  prensa encima y mostraba 51; ahora solo suma los que la ficha no tiene (36). Los coordinadores del Senado salen de `ponentes_senado`.
+- `tramite.cambios` registraba un «cambio» cada vez que la ficha publicaba algo aunque el estado fuera el mismo, y la bitácora decía
+  «cambió de “Trámite en Comisión” a “Trámite en Comisión”». Ahora cada cambio guarda `pub` (lo publicado) y la bitácora muestra eso.
+- `?local=1` lee `Bases de datos/ley-rescate/estado.json`, no `ley-rescate-data/`: para ver lo recién publicado, abrir sin el parámetro.

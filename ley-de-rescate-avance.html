@@ -73,13 +73,15 @@
 LR.pagina('hub', E => {
   const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia;
   // Ponentes: los de la Cámara salen de su ficha oficial; los del Senado, de la prensa mientras su registro no los publique.
-  const PS = E.proyecto.ponentes_senado, psn = PS ? PS.lista.length : 0, PD = E.proyecto.primer_debate, CA = E.proyecto.cambios || [];
+  // Desde el 19-nov la ficha de la Cámara trae también a los ponentes del Senado: de la lista de prensa solo se suman los que la ficha no tiene.
+  const slug = n => n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), enFicha = new Set(pon.map(slug));
+  const PS = E.proyecto.ponentes_senado, PSX = PS ? PS.lista.filter(x => !enFicha.has(x.s || slug(x.n))) : [], psn = PSX.length, PD = E.proyecto.primer_debate, CA = E.proyecto.cambios || [];
   const vota = PD && PD.previsto >= E.hoy ? PD : null, sesion = a => /conjunt/i.test(a.titulo || '') ? 'Sesión conjunta de las comisiones económicas' : a.ambito;
   const K = [['Dónde está', T.estado || 'Sin dato', `Sigue: ${ahora ? ahora.nom.toLowerCase() : 'sancionada'}${U ? ' · con mensaje de urgencia' : ''}`, ''],
     ag.length ? ['Próxima sesión', larga(ag[0].fecha), esc(sesion(ag[0])) + (vota ? `. Votación prevista: ${larga(vota.previsto)}, según ${vota.fuentes.map(f => `<a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.n)}</a>`).join(' y ')}` : ''), '']
       : vota ? ['Votación prevista', larga(vota.previsto), `${esc(vota.texto)} Todavía no está en un orden del día: ${vota.fuentes.map(f => `<a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.n)}</a>`).join(' · ')}.`, '']
       : ['Próxima votación', 'Sin fecha', 'No aparece en ningún orden del día publicado hasta el ' + corta((T.ordenes_hasta || E.hoy).slice(0, 10)), 'alerta'],
-    ['Ponentes', pon.length + psn ? String(pon.length + psn) : 'Sin publicar', pon.length + psn ? `${pon.length ? `${pon.length} en la Cámara, según su ficha oficial` : 'La ficha de la Cámara aún no los trae'}${psn ? ` · ${psn} en el Senado, según <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>` : ''}. <a href="#ponentes">Ver quiénes</a>` : 'La ficha oficial todavía no los trae', ''],
+    ['Ponentes', pon.length + psn ? String(pon.length + psn) : 'Sin publicar', pon.length + psn ? `${pon.length ? `${pon.length} según la ficha oficial de la Cámara, que incluye a los del Senado` : 'La ficha de la Cámara aún no los trae'}${psn ? ` · ${psn} más del Senado, según <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>` : ''}. <a href="#ponentes">Ver quiénes</a>` : 'La ficha oficial todavía no los trae', ''],
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
   $('#kpis').innerHTML = K.map(([l, v, d, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${esc(v)}</div><div class="d">${d}</div></div>`).join('');
   const TT = E.termometro || {}, idx = o => { const p = (o.a || 0) + (o.r || 0) + (o.m || 0); return p ? Math.round(100 * ((o.r || 0) + (o.m || 0) / 2) / p) : null; };
@@ -108,7 +110,7 @@ LR.pagina('hub', E => {
   const temas = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, 'todo') })), top = [...temas].sort((a, b) => b.o.n - a.o.n)[0];
   const apoy = temas.filter(x => x.o.post >= 20).sort((a, b) => b.o.apoya / b.o.post - a.o.apoya / a.o.post)[0];
   const rNorm = dias(E.hoy, ULT.normal), rUrg = dias(E.hoy, ULT.urgencia);
-  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length + psn ? `Tiene ${pon.length + psn} ponentes de varios partidos en las cuatro comisiones económicas.` : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : ''} ${vota ? `Hacienda espera que se vote el ${larga(vota.previsto)}.` : ag.length ? '' : 'Sin fecha de votación.'}`],
+  $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length + psn ? `Tiene ${pon.length + psn} ponentes de varios partidos en las cuatro comisiones económicas.` : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : ''} ${vota ? `La votación está prevista para el ${larga(vota.previsto)}.` : ag.length ? '' : 'Sin fecha de votación.'}`],
     ['Reloj', U ? `El Gobierno radicó <b>mensaje de urgencia</b> el ${corta(U.fecha)}: las comisiones económicas de Cámara y Senado la estudian juntas y quedan <b>${Math.max(rUrg, 0)} días</b> para que el primer debate alcance antes del 16 de diciembre. La Constitución les pide decidir en 30 días.` : rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
     ['Votos', `${CS.length > 2 ? 'Votan las cuatro comisiones económicas y la ley necesita mayoría en cada una. ' : ''}Declarados en contra: ${y(CS.map(c => `${cuenta(c, 'no')} de ${camaras[c].total} en la ${NOMC[c]}`))}. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${y(CS.map(c => `${tSi(c)} de ${camaras[c].total} (hacen falta ${camaras[c].mayoria})`))}.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]
@@ -121,16 +123,15 @@ LR.pagina('hub', E => {
   }
   // Ponentes por comisión, con foto y partido. La comisión de cada representante sale de las plantillas de votos.json.
   if (pon.length || psn) {
-    const slug = n => n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const dondeEs = {}; for (const b of E.votos.bloques) for (const [c, l] of Object.entries(b.plantilla || {})) for (const s of l) dondeEs[s] = [c, b.nombre];
-    const coord = new Set((E.proyecto.coordinadores_camara || []).map(slug));
+    const coord = new Set([...(E.proyecto.coordinadores_camara || []).map(slug), ...(PS ? PS.lista.filter(x => x.coord).map(x => x.s || slug(x.n)) : [])]);
     const G = { camara: [], camara4: [], senado: [], senado4: [] };
     for (const n of pon) { const s = slug(n), [c, b] = dondeEs[s] || ['camara', '']; (G[c] || G.camara).push({ n, s, b, co: coord.has(s) }); }
-    for (const x of (PS ? PS.lista : [])) { const s = x.s || slug(x.n); (G[x.c] || G.senado).push({ n: x.n, s, b: x.p, co: !!x.coord }); }
+    for (const x of PSX) { const s = x.s || slug(x.n); (G[x.c] || G.senado).push({ n: x.n, s, b: x.p, co: !!x.coord }); }
     const NC = { camara: 'Tercera de la Cámara', camara4: 'Cuarta de la Cámara', senado: 'Tercera del Senado', senado4: 'Cuarta del Senado' };
     $('#pon').innerHTML = Object.entries(G).filter(([, l]) => l.length).map(([c, l]) => `<div class="pon-c"><h4>${NC[c]} · ${l.length}</h4><ul>${l.sort((a, b) => b.co - a.co).map(m => `<li>${cara(E, m.s, m.n)}<span>${esc(m.n)}${m.co ? '<span class="co">coordinador</span>' : ''}<small>${esc(m.b)}</small></span></li>`).join('')}</ul></div>`).join('');
-    const pb = [...pon.map(n => (dondeEs[slug(n)] || [])[1]), ...(PS ? PS.lista.map(x => x.p) : [])].filter(Boolean), np = new Set(pb).size;
-    $('#pon-sub').innerHTML = `${pon.length + psn} congresistas de ${np} bancadas, ${E.proyecto.coordinacion ? `con ${esc(E.proyecto.coordinacion)}` : 'con coordinadores en cada comisión'}. Los de la Cámara salen de su <a href="${esc(E.proyecto.ficha)}" target="_blank" rel="noopener">ficha oficial</a>${psn ? `; los del Senado, de <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>, porque el registro del Senado aún no los publica` : ''}.`;
+    const pb = [...pon.map(n => (dondeEs[slug(n)] || [])[1]), ...PSX.map(x => x.p)].filter(Boolean), np = new Set(pb).size;
+    $('#pon-sub').innerHTML = `${pon.length + psn} congresistas de ${np} bancadas, ${E.proyecto.coordinacion ? `con ${esc(E.proyecto.coordinacion)}` : 'con coordinadores en cada comisión'}. Salen de la <a href="${esc(E.proyecto.ficha)}" target="_blank" rel="noopener">ficha oficial de la Cámara</a>, que trae a los ponentes de las cuatro comisiones${psn ? `; ${psn === 1 ? 'uno del Senado sale' : `${psn} del Senado salen`} solo en <a href="${esc(PS.url)}" target="_blank" rel="noopener">${esc(PS.fuente)}</a>` : ''}.`;
     $('#ponentes').hidden = false;
   }
   const VF = (E.verificaciones || []).slice(-1)[0];
