@@ -277,8 +277,10 @@
   }
 
   /* ── reloj del trámite ───────────────────────────────────────────────
-     Sesiones ordinarias (art. 138 CP): 20 de julio a 16 de diciembre y
-     16 de marzo a 20 de junio. Esos dos periodos son una legislatura.
+     Sesiones ordinarias (art. 138 CP, modificado por el Acto Legislativo 2
+     de 2023): 20 de julio a 16 de diciembre y 16 de febrero a 20 de junio;
+     en los años de elecciones al Congreso (2026, 2030…) el segundo periodo
+     arranca el 16 de marzo. Esos dos periodos son una legislatura.
        · Ley ordinaria / orgánica: si no recibe primer debate en ninguna
          cámara antes del cierre de la legislatura, se archiva (art. 190
          Ley 5ª); ningún proyecto se tramita en más de dos legislaturas
@@ -288,8 +290,9 @@
          ordinarios y consecutivos (art. 375 CP). Caudal lo cuenta como un año.
      Los días de sesión son los hábiles (lun-vie) dentro de esos periodos,
      SIN descontar festivos: es una cota, no el número exacto de sesiones. */
-  const periodos=y=>[[`${y}-07-20`,`${y}-12-16`],[`${y+1}-03-16`,`${y+1}-06-20`]];
-  const LEG={ini:'2026-07-20',p1fin:'2026-12-16',p2ini:'2027-03-16',fin:'2027-06-20',fin2:'2028-06-20'};
+  const p2ini=y=>(y%4===2?`${y}-03-16`:`${y}-02-16`);   // y = año en que arranca el 2.º periodo
+  const periodos=y=>[[`${y}-07-20`,`${y}-12-16`],[p2ini(y+1),`${y+1}-06-20`]];
+  const LEG={ini:'2026-07-20',p1fin:'2026-12-16',p2ini:p2ini(2027),fin:'2027-06-20',fin2:'2028-06-20'};
   function enSesion(f){ const y=+f.slice(0,4); for(const yy of [y-1,y]) for(const [a,b] of periodos(yy)) if(f>=a&&f<=b) return true; return false; }
   function diasHabSesion(desde,hasta){
     let n=0; const d=dia(desde), h=dia(hasta);
