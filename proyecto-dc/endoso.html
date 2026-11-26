@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Endoso de aliados · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    /* ── THEME · estilo gráfico portado de dashboard.html ──
+       Día (cream/oxblood) por defecto en :root; noche (paper/salmón)
+       cuando documentElement[data-theme="dark"]. Las variables heredadas
+       de los componentes (--bg, --surface, --purple…) quedan como alias
+       de los tokens del dashboard. */
+    :root {
+      /* tokens crudos · DÍA (cream/oxblood) */
+      --paper: #f4f3ef;
+      --paper-2: #ecebe5;
+      --paper-3: #e0ddd2;
+      --ink: #14110a;
+      --ink-2: #5a5448;
+      --ink-3: #948e80;
+      --rule: #14110a1f;
+      --rule-strong: #14110a40;
+      --accent: #8a1e16;
+      --accent-soft: #8a1e161a;
+      --accent-tint: #8a1e1633;
+      --gold: #8a6a1a;
+      --on-accent: #f4f3ef;
+      --danger: #b03524;
+      --pending: #cdc8bd;
+      --done: #3f7d52;
+
+      /* tipografía dashboard */
+      --sans:    'Familjen Grotesk', system-ui, sans-serif;
+      --italic:  'Petrona', Georgia, serif;
+      --mono:    'Space Mono', ui-monospace, monospace;
+      --display: 'Syne', sans-serif;
+
+      /* alias → nombres heredados de los componentes (resuelven vía token) */
+      --bg: var(--paper);
+      --bg2: var(--paper-2);
+      --surface: var(--paper-2);
+      --surface2: var(--paper-3);
+      --border: var(--rule);
+      --border2: var(--rule-strong);
+      --text: var(--ink);
+      --text2: var(--ink-2);
+      --text3: var(--ink-3);
+      --blue: var(--accent);
+      --blue-dim: var(--accent-soft);
+      --purple: var(--accent);
+      --purple-dim: var(--accent-soft);
+      --amber: var(--gold);
+      --amber-dim: var(--accent-soft);
+      --white: var(--ink);
+      --active: var(--gold);
+    }
+    [data-theme="dark"] {
+      /* tokens crudos · NOCHE (paper/salmón) — default del dashboard */
+      --paper: #1a1610;
+      --paper-2: #221d15;
+      --paper-3: #2a241b;
+      --ink: #f4f3ef;
+      --ink-2: #b8b1a0;
+      --ink-3: #807a6c;
+      --rule: #f4f3ef1c;
+      --rule-strong: #f4f3ef38;
+      --accent: #d96a50;
+      --accent-soft: #d96a5018;
+      --accent-tint: #d96a5036;
+      --gold: #d6a83a;
+      --on-accent: #14110a;
+      --danger: #d96a50;
+      --pending: #2a2c38;
+      --done: #4ade80;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 18px;
+      line-height: 1.55;
+      min-height: 100vh;
+      cursor: none;
+      overflow-x: hidden;
+      font-feature-settings: "ss01","kern","liga";
+      text-rendering: optimizeLegibility;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+    ::selection { background: var(--accent); color: var(--on-accent); }
+    /* grano sutil de día (igual que dashboard.html) */
+    html:not([data-theme="dark"]) body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+      background-size: 4px 4px; opacity: .9; mix-blend-mode: multiply;
+    }
+
+    /* ── GATE LOADING ── */
+    .gate {
+      position: fixed; inset: 0; z-index: 5000;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+    }
+    .gate-text {
+      font-family: var(--mono);
+      font-size: .82rem; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text2);
+    }
+    .gate-bar {
+      width: 120px; height: 1px; background: var(--border);
+      position: relative; overflow: hidden;
+    }
+    .gate-bar::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--blue);
+      animation: gate-slide 1.4s ease-in-out infinite;
+    }
+    @keyframes gate-slide {
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(0); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* ── CURSOR ── */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* ── NAV ── */
+    nav.top {
+      position: fixed; top:0; left:0; right:0; z-index:100;
+      display: flex; align-items:center; justify-content:space-between;
+      padding: .9rem 2.5rem;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:var(--sans); font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge {
+      font-family:var(--mono); font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color: var(--purple); background: var(--purple-dim);
+      padding:.32rem .7rem; border:1px solid var(--purple-dim);
+    }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:var(--display); font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    /* ── PÁGINA ── */
+    main.wrap { position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:6.5rem 2.5rem 4rem; }
+    .hidden { display:none !important; }
+    .hero { border-bottom:1px solid var(--border); padding:1.5rem 0 2rem; margin-bottom:1.8rem; }
+    .hero-label { font-family:var(--mono); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--purple); display:flex; align-items:center; gap:.75rem; }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero h1 { font-family:var(--display); font-weight:800; font-size:clamp(2rem,4.4vw,3rem); letter-spacing:-.035em; line-height:1.04; margin:.8rem 0 1rem; max-width:22ch; }
+    .hero p { font-size:1rem; line-height:1.6; color:var(--text2); max-width:66ch; }
+    .chip { display:inline-block; margin-top:1rem; font-family:var(--mono); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase; color:var(--purple); border:1px solid var(--purple); background:var(--purple-dim); padding:.35rem .65rem; }
+
+    .panel { background:var(--surface); border:1px solid var(--border); padding:24px; margin-bottom:14px; }
+    .panel-num { font-family:var(--mono); font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--purple); }
+    .panel h3 { font-family:var(--display); font-weight:800; font-size:1.45rem; letter-spacing:-.035em; line-height:1.1; margin:12px 0 10px; }
+    .panel p { font-size:.95rem; line-height:1.55; color:var(--text2); margin-bottom:.6rem; }
+    .panel p b, .panel li b { color:var(--text); }
+    .helper { font-size:.8rem; line-height:1.5; color:var(--text3); margin:6px 0 0; }
+    .solid, .ghost { font-family:var(--sans); font-weight:700; font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; padding:.65rem 1rem; border:1px solid var(--ink); cursor:none; }
+    .solid { background:var(--ink); color:var(--paper); }
+    .solid:hover { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+    .ghost { background:transparent; color:var(--ink); }
+    .ghost:hover { border-color:var(--accent); color:var(--accent); }
+    .enlace-boton { border:0; background:none; padding:0; color:var(--accent); font:inherit; font-weight:700; font-size:.82rem; text-decoration:underline; cursor:none; }
+
+    /* Su campaña */
+    .conf { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-top:6px; }
+    .conf label { display:block; font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:6px; }
+    .conf input[type=number] { width:100%; border:1px solid var(--border2); background:var(--paper); color:var(--text); padding:.6rem .7rem; font:600 1rem var(--sans); }
+    .conf-propio { font-size:.92rem; color:var(--text); line-height:1.5; }
+    .conf-propio small { color:var(--text3); }
+    @media (max-width:700px){ .conf { grid-template-columns:1fr; } }
+
+    /* El total */
+    .en-cifra { display:flex; flex-wrap:wrap; gap:clamp(18px,4vw,44px); align-items:flex-end; margin:18px 0 6px; }
+    .en-cifra b { display:block; font-family:var(--display); font-weight:800; font-size:clamp(2.4rem,6vw,3.8rem); line-height:1; letter-spacing:-.03em; color:var(--text); }
+    .en-cifra .fuerte b { color:var(--accent); }
+    .en-cifra span { display:block; font-size:.8rem; color:var(--text3); margin-top:4px; max-width:24ch; }
+    .en-barra { height:12px; background:var(--accent-soft); border:1px solid var(--border); margin:16px 0 4px; overflow:hidden; }
+    .en-barra i { display:block; height:100%; background:var(--accent); }
+    .en-barra-et { font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); }
+
+    /* La búsqueda */
+    .en-estado { font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); margin:6px 0 0; }
+    .en-para { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--accent-soft); border:1px solid var(--accent-tint); padding:8px 12px; margin:0 0 10px; font-size:.86rem; }
+    .en-color { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+    .endoso-buscar { display:flex; border-bottom:2px solid var(--ink); margin-bottom:6px; }
+    .endoso-buscar input { flex:1; border:0; background:transparent; outline:0; padding:10px 0; font:700 1.1rem var(--sans); color:var(--text); }
+    .endoso-resultados { display:grid; gap:6px; margin-bottom:10px; }
+    .endoso-res { display:block; width:100%; text-align:left; border:1px solid var(--border); background:var(--paper); color:var(--text); padding:10px 12px; font:inherit; cursor:none; }
+    .endoso-res:hover { border-color:var(--accent); }
+    .endoso-res b { display:block; font:700 .9rem var(--sans); }
+    .endoso-res small { color:var(--text3); font-size:.76rem; }
+    .endoso-lista { display:grid; gap:10px; margin:14px 0; }
+    .endoso-fila { border:1px solid var(--border); background:var(--paper); padding:14px; }
+    .endoso-fila-top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .endoso-fila-top b { font:700 .95rem var(--sans); display:block; color:var(--text); }
+    .endoso-fila-top small { color:var(--text3); font-size:.76rem; }
+    .endoso-x { background:transparent; border:0; color:var(--text3); padding:0 4px; font:400 1.4rem var(--sans); line-height:1; cursor:none; }
+    .endoso-cifras { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin:10px 0 8px; font-size:.9rem; color:var(--text); }
+    .endoso-cifras small { color:var(--text3); font-size:.7rem; }
+    .endoso-tasa { display:inline-flex; align-items:center; gap:3px; font:600 .9rem var(--sans); }
+    .endoso-tasa input { width:58px; border:1px solid var(--border2); padding:4px 6px; font:600 .9rem var(--sans); background:var(--surface); color:var(--text); }
+    .endoso-tasa input:disabled { background:var(--accent-soft); color:var(--accent); }
+    .endoso-est { color:var(--accent); font-size:1.05rem; }
+    .endoso-apoyo { font-size:.82rem; color:var(--text); }
+    .endoso-apoyo small { color:var(--text3); }
+    .endoso-medida, .endoso-aviso { display:block; margin-top:5px; font-size:.76rem; }
+    .endoso-medida { color:var(--done); }
+    .endoso-aviso { color:var(--danger); }
+
+    /* El mapa y las listas */
+    .en-mapa-caja { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:18px; margin-top:10px; }
+    .en-mapa { height:440px; border:1px solid var(--border); background:var(--paper-3); }
+    .en-mapa .leaflet-tile-pane { filter:grayscale(.85) saturate(.5) brightness(1.06); }
+    [data-theme="dark"] .en-mapa .leaflet-tile-pane { filter:grayscale(1) invert(.9) brightness(.9); }
+    .en-mapa .leaflet-control-attribution { font-size:9px; }
+    .leaflet-tooltip.tp { font:13px var(--sans); background:rgba(20,17,10,.96); color:#fff; border:0; border-radius:0; padding:8px 10px; max-width:260px; white-space:normal; }
+    .leaflet-tooltip.tp:before { display:none; }
+    .en-leyenda { display:flex; flex-wrap:wrap; gap:6px 14px; margin:10px 0 0; font-size:.8rem; color:var(--text2); }
+    .arq-lista { margin:0 0 16px; padding:0; list-style:none; font-size:.85rem; line-height:1.5; color:var(--text2); }
+    .arq-lista li { display:flex; align-items:baseline; gap:7px; padding:4px 0; border-bottom:1px solid var(--border); }
+    .arq-lista li:last-child { border-bottom:0; }
+    .arq-lista b { color:var(--text); font-weight:800; min-width:46px; }
+    .arq-lista em { margin-left:auto; font-style:normal; font-family:var(--mono); font-size:.72rem; white-space:nowrap; }
+    .arq-punto { width:9px; height:9px; flex:0 0 9px; border-radius:50%; transform:translateY(1px); }
+    table.en-tabla { border-collapse:collapse; width:100%; min-width:560px; font-size:.82rem; }
+    .en-tabla th { text-align:left; font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .en-tabla td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text); }
+    .en-tabla .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .en-tabla small { color:var(--text3); }
+    .dd-marca { font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; padding:2px 6px; border:1px solid var(--border2); color:var(--text3); white-space:nowrap; }
+    .dd-marca.bien { border-color:var(--done); color:var(--done); }
+    @media (max-width:820px){ .en-mapa-caja { grid-template-columns:1fr; } .en-mapa { height:360px; } }
+
+    /* El líder de zona */
+    .en-acciones { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 4px; }
+    .en-lider { border:1px solid var(--accent-tint); background:var(--paper); padding:16px; margin:14px 0; }
+    .en-lider h4 { font-family:var(--display); font-weight:700; font-size:1rem; margin:0 0 4px; }
+    .en-lider label { display:block; font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); margin:14px 0 5px; }
+    .en-lider input[type=text], .en-lider input[type=number], .en-lider select { width:100%; border:1px solid var(--border2); padding:8px 10px; font:600 .95rem var(--sans); background:var(--surface); color:var(--text); }
+    .en-lider .en-mapa { height:360px; }
+    .en-zona-cuenta { font-family:var(--mono); font-size:.72rem; letter-spacing:.04em; color:var(--accent); margin-top:6px; }
+    .en-privado { margin-top:12px; border-left:3px solid var(--accent); padding:8px 12px; background:var(--accent-soft); font-size:.82rem; line-height:1.55; color:var(--text); }
+    .nota { margin-top:24px; font-size:.8rem; line-height:1.6; color:var(--text3); }
+    .nota b { color:var(--text2); }
+
+    @media (max-width:700px){ main.wrap { padding:6rem 1.1rem 3rem; } nav.top { padding:.8rem 1.1rem; } .logo-text { font-size:1.05rem; } }
+    @media (hover:none){ body { cursor:auto !important; } .cursor, .cursor-ring { display:none !important; } button, a, .solid, .ghost, .enlace-boton, .endoso-res, .endoso-x { cursor:pointer !important; } }
+  </style>
+</head>
+<body>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+    <header class="hero">
+      <div class="hero-label">Proyecto DC · módulo 09</div>
+      <h1>Endoso de aliados.</h1>
+      <p>Un aliado no le pasa todos sus votos: le pasa una parte, y solo la que está <b>en Medellín</b>. Sume a los excandidatos que lo van a apoyar y a los líderes sin candidatura propia, marcando en el mapa dónde trabajan. Si dice a quién apoyaron antes, medimos cuánto rindió esa persona donde ellos estaban, y con eso estimamos lo que le pueden pasar.</p>
+      <span class="chip">Territorio · Medellín · electorado de referencia: Alcaldía 2023</span>
+    </header>
+
+    <section class="panel">
+      <span class="panel-num">00 · Su punto de partida</span>
+      <h3>Dos datos opcionales que afinan la lectura.</h3>
+      <div class="conf">
+        <div>
+          <label for="enMetaInput">Meta de votos</label>
+          <input type="number" id="enMetaInput" min="0" step="1000" placeholder="Por ejemplo, 350000">
+          <p class="helper">Con ella decimos qué parte de la meta cubre el endoso. Se guarda solo en este navegador.</p>
+        </div>
+        <div>
+          <label>Su votación anterior</label>
+          <div class="conf-propio" id="enPropio"></div>
+          <p class="helper">Con ella separamos el endoso que cae donde usted ya saca votos del que trae gente nueva.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="enAliadosSec">
+      <span class="panel-num">01 · Sus aliados</span>
+      <h3>Sume a quien lo va a apoyar.</h3>
+      <p>Los excandidatos se buscan por nombre: sirve cualquier candidatura con resultados desde 2010 (Congreso, Asamblea, Concejo, JAL, alcaldías y gobernaciones), y primero salen las de Antioquia. A quien no estuvo en un tarjetón, súmelo como líder.</p>
+      <div id="enPara" class="en-para hidden"></div>
+      <div class="endoso-buscar"><input id="enBuscar" type="search" autocomplete="off" placeholder="Nombre y apellido" aria-label="Buscar una candidatura"></div>
+      <p class="en-estado" id="enIndice">Cargando el índice electoral…</p>
+      <div id="enResultados" class="endoso-resultados"></div>
+      <div class="en-acciones"><button type="button" class="ghost" id="enNuevoLider">+ Sumar un líder sin candidatura</button></div>
+      <div id="enLiderForm" class="en-lider hidden">
+        <h4 id="enLiderTitulo">Un líder sin candidatura propia</h4>
+        <p class="helper" style="margin:0">Una junta de acción comunal, una iglesia, una organización: alguien que mueve votos sin haber estado en el tarjetón. Marque dónde trabaja y diga a quién apoyó; medimos cuánto rindió esa persona ahí contra el resto de la comuna.</p>
+        <label for="enLiderNombre">Nombre o apodo</label>
+        <input type="text" id="enLiderNombre" maxlength="60" placeholder="Como usted lo reconozca: «Doña Rosa, JAC El Salado»">
+        <label>¿A quién apoyó antes?</label>
+        <div id="enLiderApoyo" class="helper" style="margin:0"></div>
+        <label for="enLiderComuna">Dónde trabaja: toque los puestos en el mapa, o sume una comuna entera</label>
+        <select id="enLiderComuna"><option value="">Sumar una comuna completa…</option></select>
+        <div class="en-mapa" id="enLiderMapa" style="margin-top:8px"></div>
+        <div class="en-zona-cuenta" id="enLiderCuenta">Ningún puesto marcado</div>
+        <label for="enLiderDeclarado">¿Cuántos votos dice que maneja? (opcional)</label>
+        <input type="number" id="enLiderDeclarado" min="0" step="1" placeholder="Si no lo sabe, déjelo en blanco">
+        <p class="en-privado"><b>Este nombre se queda en su navegador.</b> No lo guardamos en ningún servidor ni lo vemos nosotros: es un dato de una persona que no está en ningún registro público. Lo que se mide sale de votaciones y puestos, que sí son públicos. Si borra los datos del navegador o cambia de computador, tendrá que volver a sumarlo.</p>
+        <div class="en-acciones"><button type="button" class="solid" id="enLiderGuardar">Guardar líder</button><button type="button" class="ghost" id="enLiderCancelar">Cancelar</button></div>
+      </div>
+      <p class="en-privado hidden" id="enAviso"></p>
+      <div id="enLista" class="endoso-lista"></div>
+    </section>
+
+    <section class="panel hidden" id="enTotalSec">
+      <span class="panel-num">02 · Cuánto le pueden pasar</span>
+      <h3 id="enTotalTitulo">El endoso estimado.</h3>
+      <div class="en-cifra">
+        <div class="fuerte"><b id="enTotal">—</b><span id="enTotalSub">votos, punto medio</span></div>
+        <div><b id="enTecho">—</b><span id="enTechoSub">votos de sus aliados en Medellín</span></div>
+        <div id="enMetaCaja"><b id="enMeta">—</b><span id="enMetaSub">de su meta</span></div>
+      </div>
+      <div class="en-barra hidden" id="enBarraCaja"><i id="enBarra" style="width:0"></i></div>
+      <span class="en-barra-et hidden" id="enBarraEt"></span>
+      <p id="enTotalCopy" style="margin-top:14px"></p>
+    </section>
+
+    <section class="panel hidden" id="enMapaSec">
+      <span class="panel-num">03 · Dónde</span>
+      <h3>Dónde está ese endoso.</h3>
+      <p id="enMapaCopy">Cada círculo es un puesto de votación: el tamaño es cuánto le pueden pasar ahí y el color, qué aliado pesa más.</p>
+      <div class="en-mapa-caja">
+        <div><div class="en-mapa" id="enMapa"></div><div class="en-leyenda" id="enLeyenda"></div></div>
+        <div><p style="margin:0 0 6px"><b>Por comuna o corregimiento</b></p><ul class="arq-lista" id="enAreas"></ul></div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="enSolapeSec">
+      <span class="panel-num">04 · Dónde se pisan</span>
+      <h3>Qué aliados trabajan los mismos puestos.</h3>
+      <p id="enSolapeCopy"></p>
+      <ul class="arq-lista" id="enSolapes"></ul>
+    </section>
+
+    <section class="panel hidden" id="enNuevosSec">
+      <span class="panel-num">05 · Dónde le suma votos nuevos</span>
+      <h3>Los puestos donde sus aliados pesan más.</h3>
+      <p id="enNuevosCopy"></p>
+      <div style="overflow-x:auto;border:1px solid var(--border)"><table class="en-tabla"><thead><tr><th>#</th><th>Puesto</th><th class="num">Endoso</th><th class="num">Votos suyos antes</th><th>Aliado que más pesa</th></tr></thead><tbody id="enNuevosFilas"></tbody></table></div>
+      <div class="en-acciones"><button type="button" class="solid" id="enCsv">Descargar todos los puestos (Excel)</button></div>
+      <p class="helper">El archivo se arma en su navegador y baja a su computador: no pasa por nuestros servidores. Por eso sí lleva el nombre de sus líderes.</p>
+    </section>
+
+    <p class="nota" id="enNota"></p>
+  </main>
+
+  <script src="../platform-config.js"></script>
+  <script src="../data-client.js"></script>
+  <script src="../cand-index.js?v=20261102"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="../partidos-bloques.js?v=20261102"></script>
+  <!-- El mismo motor del panel 08 de Candidato 360: no puede dar cifras distintas. -->
+  <script src="../candidato-360-electorado.js?v=20260929"></script>
+  <script src="../candidato-360-endoso.js?v=20260928g"></script>
+  <script>
+  // ─── ACCESO ───────────────────────────────────────────────────────
+  // Quién entra lo decide el worker: /auth/me devuelve las llaves de esta cuenta
+  // (`accesos`). Los correos no viven en el código, que es público.
+  const ACCESO = 'proyecto-dc';
+  const token = localStorage.getItem('rr-token');
+  let user = null; try { user = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch (e) {}
+  function tieneAcceso(u){ return !!u && Array.isArray(u.accesos) && u.accesos.indexOf(ACCESO) >= 0; }
+  function cacheNiega(u){ return !!u && Array.isArray(u.accesos) && !tieneAcceso(u); }
+  function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html?next=proyecto-dc/endoso.html'); }
+  function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+  if (!token || !user) denyToLogin();
+  else if (cacheNiega(user)) denyToDashboard();
+  else {
+    (async () => {
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.status === 401) return denyToLogin();
+        const data = await res.json();
+        if (!data.ok || !tieneAcceso(data.user)) return denyToDashboard();
+        user = Object.assign({}, user, data.user);
+        localStorage.setItem('rr-user', JSON.stringify(user));
+        revealPage();
+      } catch (e) { revealPage(); }
+    })();
+  }
+  function revealPage(){
+    const g = document.getElementById('gate'); if (g) g.remove();
+    document.getElementById('topNav').hidden = false;
+    document.getElementById('main').hidden = false;
+    arrancar();
+  }
+
+  function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+  const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+  document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+  // ─── CURSOR ───────────────────────────────────────────────────────
+  (function () {
+    const cur = document.getElementById('cursor'), ring = document.getElementById('cursorRing');
+    document.addEventListener('mousemove', e => { cur.style.left = ring.style.left = e.clientX + 'px'; cur.style.top = ring.style.top = e.clientY + 'px'; });
+    document.addEventListener('mouseover', e => {
+      const t = e.target, hover = t && t.closest && t.closest('a,button,select,input,.leaflet-interactive');
+      cur.style.transform = hover ? 'translate(-50%,-50%) scale(1.6)' : 'translate(-50%,-50%) scale(1)';
+      cur.style.background = hover ? 'transparent' : 'var(--purple)';
+      cur.style.border = hover ? '1.5px solid var(--purple)' : 'none';
+      ring.style.opacity = hover ? '0' : '.4';
+    });
+  })();
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ENDOSO DE ALIADOS · Medellín
+     Es el panel 08 de Candidato 360 con el territorio fijo: los cálculos los
+     hace candidato-360-endoso.js (window.C360Endoso), el mismo archivo, para
+     que las dos páginas no puedan dar cifras distintas. Lo propio de acá:
+     el territorio (Medellín, código electoral 01-001), el electorado de
+     referencia (Alcaldía 2023), la meta y la votación propia, que se escriben
+     a mano y se guardan en este navegador.
+     ═══════════════════════════════════════════════════════════════════ */
+  function arrancar() { (async function () {
+  const E = window.C360Endoso, EL = window.C360Electorado;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+  const MENUDAS = /\b(De|Del|La|Las|Los|Y|El|En)\b/g;
+  const lugar = n => String(n || '').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
+    .replace(MENUDAS, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
+    .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, s => s.toUpperCase()).replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`);
+  const num = x => Number(x || 0).toLocaleString('es-CO');
+  const pct0 = x => `${Math.round((x || 0) * 100)} %`;
+  const COLORES = ['#1f7a60', '#d96a50', '#3b6fb6', '#c88a2e', '#7c4dab', '#2a9aa6', '#b23a5b', '#5d7a2a'];
+  const colorDe = i => COLORES[i % COLORES.length];
+
+  const correo = String(user?.email || 'anon').toLowerCase();
+  const CANDIDATURA = 'pdc-medellin-alcaldia-2027';
+  const K_META = `pdc-endoso-meta:${correo}`, K_PROPIO = `pdc-endoso-propio:${correo}`, K_ULTIMO = `pdc-endoso-ultimo:${correo}`;
+  const ALCANCE = { tipo: 'municipio', departamento: '1', municipio: '1', municipioNombre: 'MEDELLIN', nombre: 'Medellín' };
+  const ST = { clave: E.clave(correo, CANDIDATURA), aliados: [], alcance: ALCANCE, lugar: 'Medellín', corp: 'alcaldia', propio: null, propioFicha: null, meta: 0, lectura: null, para: null, indice: [], indiceListo: false, mapa: null, capa: null, georef: null, turno: 0 };
+  ST.aliados = E.cargar(ST.clave);
+  try { ST.propioFicha = JSON.parse(localStorage.getItem(K_PROPIO) || 'null'); } catch (e) {}
+  ST.meta = Number(localStorage.getItem(K_META) || 0) || 0;
+  function guardar() { E.guardar(ST.clave, ST.aliados); }
+
+  const CORP_TXT = { jal: 'un edil', concejo: 'un concejal', alcaldia: 'un candidato a alcaldía', asamblea: 'un diputado', gobernacion: 'un candidato a gobernación', camara: 'un representante', senado: 'un senador' };
+  function fuenteDe(f) {
+    const r = f.ret, quien = r?.propia ? CORP_TXT[r.corp] || 'un candidato' : 'un candidato';
+    const ret = r ? `quien repite como ${quien} conserva entre el ${pct0(r.q[0])} y el ${pct0(r.q[2])} de su voto ${r.medida} años después (mediana ${pct0(r.q[1])}, ${num(r.n)} casos${r.propia ? '' : ' de todas las corporaciones'})` : '';
+    if (f.fuente === 'suya') return 'tasa que usted escribió';
+    if (f.fuente === 'lider') {
+      const R = f.ret, des = R ? `una base electoral conserva entre el ${pct0(R.q[0])} y el ${pct0(R.q[2])} de sus votos ${R.medida} años después (mediana ${pct0(R.q[1])}, ${num(R.n)} casos)` : '';
+      return f.terr > 0 ? `el efecto medido, desgastado por el tiempo${des ? `: ${des}` : ''}` : 'medido: no se nota efecto en su zona';
+    }
+    if (f.fuente === 'declarado') return 'lo que usted dice que maneja, sin medir: la cifra no se desgasta ni se contrasta con votos';
+    if (f.fuente === 'sin-dato') return 'sin medir: diga a quién apoyó o cuántos votos maneja';
+    if (f.fuente === 'medida') return `medida con a quién apoyó; ${ret ? `acotada por el tiempo: ${ret}` : 'sin acotar'}`;
+    if (f.fuente === 'regresion') return `estimada puesto a puesto con a quién apoyó; ${ret ? `acotada por el tiempo: ${ret}` : 'sin acotar'}`;
+    if (f.fuente === 'retencion') return `sin medir: ${ret}. Diga a quién apoyó para medirla`;
+    return E.FUENTE[f.fuente] || '';
+  }
+  function regTexto(f) {
+    const r = f.reg; if (!r) return '';
+    const quien = esc(lugar(f.al.apoyo?.nombre || 'esa persona'));
+    if (!r.valida) return `<span class="endoso-aviso">Regresión: no se usa, ${esc(r.motivo)}.</span>`;
+    return `<span class="endoso-medida">Puesto a puesto (${num(r.n)} puestos): el <b>${pct0(r.tau)}</b> de sus votantes votó por ${quien} (± ${Math.round(1.96 * r.error * 100)} puntos), contra el ${pct0(r.alfa)} del resto.</span>`
+      + (r.tau < r.alfa ? `<span class="endoso-aviso">Sus votantes se inclinaron por ${quien} menos que el resto del electorado: su apoyo no se notó en las urnas.</span>` : '');
+  }
+  const rotulo = c => `${c.corp || 'Candidatura'}${c.partido ? ` · ${c.partido}` : ''}`;
+  function depDelSlug(slug) {
+    const s = String(slug || '');
+    let m = s.match(/^(?:ASAM|CONC|JAL|ALC|GOB)\d{4}-(\d{1,2})-/); if (m) return String(Number(m[1]));
+    m = s.match(/^CON\d{4}-C-(\d{1,2})-/); return m ? String(Number(m[1])) : '';
+  }
+
+  /* ── Su punto de partida ───────────────────────────────────────────── */
+  function pintarPropio() {
+    const f = ST.propioFicha;
+    $('enPropio').innerHTML = f
+      ? `<b>${esc(lugar(f.nombre))}</b> <small>${esc(rotulo(f))}${f.votos ? ` · ${num(f.votos)} votos` : ''}</small><br><button type="button" class="enlace-boton" onclick="EN.propio()">cambiar</button> <button type="button" class="enlace-boton" onclick="EN.quitarPropio()">quitar</button>`
+      : `<button type="button" class="enlace-boton" onclick="EN.propio()">+ Buscar la candidatura con la que compitió antes</button>`;
+  }
+  async function cargarPropio() {
+    ST.propio = null;
+    if (ST.propioFicha?.dataUrl) { try { ST.propio = await E.mesas(ST.propioFicha.dataUrl); } catch (e) { ST.propio = null; } }
+  }
+
+  /* ── Buscar ────────────────────────────────────────────────────────── */
+  let temporizador = null;
+  function buscar(q) {
+    const caja = $('enResultados'); q = String(q || '').trim();
+    if (q.length < 2) { caja.innerHTML = ''; return; }
+    if (!ST.indice.length) { caja.innerHTML = '<p class="helper">El índice electoral todavía está llegando; pruebe de nuevo en unos segundos.</p>'; return; }
+    const r = CandRegistry.acRank(q, ST.indice, 40);
+    const items = r.items.map((c, i) => ({ c, i, casa: depDelSlug(c.slug) === '1' })).sort((a, b) => (b.casa - a.casa) || (a.i - b.i)).map(x => x.c);
+    const vista = items.slice(0, 8);
+    if (!vista.length) { caja.innerHTML = `<p class="helper">${ST.indiceListo ? 'Sin coincidencias.' : 'Sin coincidencias por ahora: seguimos cargando concejos y JAL.'}</p>`; return; }
+    caja.innerHTML = vista.map(c => `<button type="button" class="endoso-res" data-slug="${esc(c.slug)}"><b>${esc(c.nombre)}</b><small>${esc(rotulo(c))}${c.votos ? ` · ${num(c.votos)} votos` : ''}</small></button>`).join('')
+      + (r.total > vista.length ? `<p class="helper">${vista.length} de ${num(r.total)} · agregue un apellido para afinar.</p>` : '');
+    caja.querySelectorAll('.endoso-res').forEach(b => b.onclick = () => elegir(vista.find(c => c.slug === b.dataset.slug)));
+  }
+  function limpiarBusqueda() { $('enBuscar').value = ''; $('enResultados').innerHTML = ''; }
+  async function elegir(c) {
+    if (!c) return;
+    if (ST.para === 'propio') {
+      ST.propioFicha = E.ficha(c, CandRegistry.dataUrlFor);
+      try { localStorage.setItem(K_PROPIO, JSON.stringify(ST.propioFicha)); } catch (e) {}
+      ST.para = null; limpiarBusqueda(); pintarModo(); pintarPropio();
+      await cargarPropio(); calcular();
+      return;
+    }
+    if (ST.para === 'lider' && ST.lider) {
+      ST.lider.apoyo = E.ficha(c, CandRegistry.dataUrlFor);
+      ST.para = null; limpiarBusqueda(); pintarModo(); pintarLiderApoyo();
+      $('enLiderForm').scrollIntoView({ behavior: 'instant', block: 'start' });
+      return;
+    }
+    const i = ST.para;
+    if (i !== null && ST.aliados[i]) {
+      if (c.slug === ST.aliados[i].slug) return alert('Esa es la misma candidatura del aliado: elija a la persona que apoyó.');
+      ST.aliados[i].apoyo = E.ficha(c, CandRegistry.dataUrlFor);
+    } else {
+      if (ST.aliados.some(a => a.slug === c.slug)) return alert('Ese aliado ya está en la lista.');
+      if (ST.aliados.length >= E.MAX) return alert(`Por ahora se pueden sumar hasta ${E.MAX} aliados.`);
+      ST.aliados.push({ ...E.ficha(c, CandRegistry.dataUrlFor), apoyo: null, manual: null });
+    }
+    ST.para = null; guardar(); limpiarBusqueda(); pintarModo(); calcular();
+  }
+  function pintarModo() {
+    const caja = $('enPara');
+    const txt = ST.para === 'propio' ? 'Busque abajo la candidatura con la que <b>usted</b> compitió antes.'
+      : ST.para === 'lider' ? `¿A quién apoyó <b>${esc(ST.lider?.nombre || 'su líder')}</b> antes? Búsquelo abajo.`
+      : ST.para !== null && ST.aliados[ST.para] ? `¿A quién apoyó <b>${esc(ST.aliados[ST.para].nombre)}</b> antes? Búsquelo abajo.` : '';
+    $('enBuscar').placeholder = !txt ? 'Nombre y apellido' : ST.para === 'propio' ? 'Su nombre' : 'Nombre de la candidatura que apoyó';
+    if (!txt) { caja.classList.add('hidden'); caja.innerHTML = ''; return; }
+    caja.innerHTML = `<span>${txt}</span><button type="button" class="enlace-boton" id="enCancelar">cancelar</button>`;
+    caja.classList.remove('hidden');
+    $('enCancelar').onclick = () => { ST.para = null; pintarModo(); buscar(''); };
+  }
+  function irABuscar() { const inp = $('enBuscar'); inp.value = ''; inp.focus(); inp.scrollIntoView({ behavior: 'instant', block: 'center' }); }
+
+  const A = {
+    apoyo(i) { ST.para = i; pintarModo(); irABuscar(); },
+    quitar(i) { ST.aliados.splice(i, 1); if (ST.para === i) ST.para = null; guardar(); pintarModo(); calcular(); },
+    quitarApoyo(i) { if (ST.aliados[i]) { ST.aliados[i].apoyo = null; guardar(); calcular(); } },
+    editarLider(i) { abrirLider(i); },
+    apoyoLider() { if (!ST.lider) return; ST.lider.nombre = $('enLiderNombre').value.trim(); ST.para = 'lider'; pintarModo(); irABuscar(); },
+    quitarApoyoLider() { if (ST.lider) { ST.lider.apoyo = null; pintarLiderApoyo(); } },
+    propio() { ST.para = 'propio'; pintarModo(); irABuscar(); },
+    quitarPropio() { ST.propioFicha = null; ST.propio = null; try { localStorage.removeItem(K_PROPIO); } catch (e) {} pintarPropio(); calcular(); },
+    tasa(i, valor) {
+      const al = ST.aliados[i]; if (!al) return;
+      const v = String(valor).trim() === '' ? null : Math.max(0, Math.min(100, Number(valor)));
+      al.manual = Number.isFinite(v) ? v : null; guardar(); calcular();
+    },
+  };
+
+  /* ── El líder de zona ──────────────────────────────────────────────── */
+  async function cargarGeoref() { if (!ST.georef) { try { ST.georef = await EL.puestos(); } catch { ST.georef = {}; } } return ST.georef; }
+  const NO_ES_LUGAR = /^(NULL|C[AÁ]RCEL|PUESTO CENSO)/i;
+  function claveComuna(n) {
+    if (!n || NO_ES_LUGAR.test(n)) return '';
+    /* En Medellín el georef escribe la misma comuna como «AMERICA» y como
+       «COMUNA 12 LA AMERICA»: se agrupan por el nombre sin el número. */
+    return n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/^(COMUNA|CORREGIMIENTO|CORREG\.?)\s*\d*\s*/, '').replace(/^LA\s+/, '').replace(/\s+/g, ' ').trim();
+  }
+  async function puestosDelTerritorio() {
+    const G = await cargarGeoref();
+    return Object.entries(G).filter(([, g]) => g?.mesa && Number.isFinite(g.lat) && g.lat && E.enAlcance(g.mesa, ST.alcance))
+      .map(([code, g]) => { const nombre = String(g.mesa.comNom || '').replace(/^\d{2}(?=\S)/, '').trim(); return { code, g, comuna: claveComuna(nombre), comunaNombre: nombre }; });
+  }
+  const zonaItem = (code, g) => ({ code, nombre: g?.nombre || '', comNom: g?.mesa?.comNom || '', munNom: g?.mesa?.munNom || '' });
+  async function abrirLider(i = null) {
+    const al = i !== null ? ST.aliados[i] : null;
+    ST.lider = { i, nombre: al?.nombre || '', apoyo: al?.apoyo || null, declarado: al?.declarado ?? null, zona: new Map((al?.zona || []).map(z => [z.code, z])) };
+    $('enLiderTitulo').textContent = al ? `Editar a ${al.nombre}` : 'Un líder sin candidatura propia';
+    $('enLiderNombre').value = ST.lider.nombre;
+    $('enLiderDeclarado').value = Number.isFinite(ST.lider.declarado) ? ST.lider.declarado : '';
+    $('enLiderForm').classList.remove('hidden'); $('enAviso').classList.add('hidden');
+    pintarLiderApoyo();
+    $('enLiderForm').scrollIntoView({ behavior: 'instant', block: 'start' });
+    $('enLiderCuenta').textContent = 'Cargando los puestos de Medellín…';
+    const lista = ST.puestosTerr = await puestosDelTerritorio();
+    const rotulos = new Map();
+    lista.forEach(x => { if (!x.comuna) return; const r = rotulos.get(x.comuna); if (!r || x.comunaNombre.length > r.length) rotulos.set(x.comuna, x.comunaNombre); });
+    const nComuna = c => Number(String(rotulos.get(c)).match(/\d+/)?.[0] || 999);
+    const comunas = [...rotulos.keys()].sort((a, b) => (nComuna(a) - nComuna(b)) || a.localeCompare(b, 'es'));
+    $('enLiderComuna').innerHTML = '<option value="">Sumar una comuna completa…</option>' + comunas.map(c => `<option value="${esc(c)}">${esc(lugar(rotulos.get(c)))}</option>`).join('');
+    $('enLiderComuna').classList.toggle('hidden', !comunas.length);
+    pintarMapaLider();
+  }
+  function cerrarLider() { ST.lider = null; if (ST.para === 'lider') { ST.para = null; pintarModo(); } $('enLiderForm').classList.add('hidden'); }
+  function pintarLiderApoyo() {
+    const a = ST.lider?.apoyo;
+    $('enLiderApoyo').innerHTML = a
+      ? `<b>${esc(lugar(a.nombre))}</b> <small>${esc(rotulo(a))}</small> <button type="button" class="enlace-boton" onclick="EN.apoyoLider()">cambiar</button> <button type="button" class="enlace-boton" onclick="EN.quitarApoyoLider()">quitar</button>`
+      : `<button type="button" class="enlace-boton" onclick="EN.apoyoLider()">+ Buscar la candidatura que apoyó</button> <span>Sin esto no hay qué medir: solo cuenta lo que usted diga que maneja.</span>`;
+  }
+  async function contarZona() {
+    const z = ST.lider?.zona; if (!z) return;
+    let texto = z.size ? `${num(z.size)} puesto${z.size === 1 ? '' : 's'} marcado${z.size === 1 ? '' : 's'}` : 'Ningún puesto marcado';
+    if (z.size) { try { const T = await E.totales(`${ST.corp}-2023`); const v = [...z.keys()].reduce((t, k) => t + (T[k]?.[0] || 0), 0); if (v) texto += ` · ${num(v)} votos válidos ahí en la Alcaldía 2023`; } catch {} }
+    $('enLiderCuenta').textContent = texto;
+  }
+  function pintarMapaLider() {
+    const lista = ST.puestosTerr || [];
+    if (!ST.mapaLider) {
+      ST.mapaLider = window.L.map('enLiderMapa', { scrollWheelZoom: false, zoomSnap: .25, zoomDelta: .5 }).setView([6.25, -75.58], 12);
+      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(ST.mapaLider);
+    }
+    if (ST.capaLider) ST.mapaLider.removeLayer(ST.capaLider);
+    const estilo = sel => ({ radius: sel ? 7 : 4.5, color: '#fff', weight: 1, fillColor: sel ? '#d96a50' : '#8a8f86', fillOpacity: sel ? .95 : .55 });
+    ST.capaLider = window.L.featureGroup(lista.map(({ code, g }) => {
+      const mk = window.L.circleMarker([g.lat, g.lng], estilo(ST.lider.zona.has(code)))
+        .bindTooltip(`<b>${esc(lugar(g.nombre || code))}</b><br>${esc(lugar(g.barrio || g.mesa?.comNom || ''))}`, { sticky: true, className: 'tp' });
+      mk.on('click', () => {
+        const z = ST.lider.zona;
+        if (z.has(code)) z.delete(code); else z.set(code, zonaItem(code, g));
+        mk.setStyle(estilo(z.has(code))); mk.setRadius(estilo(z.has(code)).radius); contarZona();
+      });
+      return mk;
+    })).addTo(ST.mapaLider);
+    setTimeout(() => {
+      ST.mapaLider.invalidateSize();
+      const marcados = lista.filter(x => ST.lider?.zona.has(x.code));
+      /* El encuadre va sobre la zona urbana: los corregimientos estiran el marco. */
+      const base = marcados.length ? marcados : lista.filter(x => !/^(5|6|7|8|9)0/.test(String(x.g.mesa?.com || '')) && x.g.mesa?.zon !== '99');
+      const b = window.L.latLngBounds((base.length ? base : lista).map(x => [x.g.lat, x.g.lng]));
+      if (b.isValid()) ST.mapaLider.fitBounds(b, { padding: [14, 14], maxZoom: 15, animate: false });
+    }, 0);
+    contarZona();
+  }
+  async function guardarLider() {
+    const L = ST.lider; if (!L) return;
+    const nombre = $('enLiderNombre').value.trim();
+    if (!nombre) return alert('Póngale un nombre o apodo, para reconocerlo en la lista.');
+    if (!L.zona.size) return alert('Marque en el mapa al menos un puesto donde trabaja.');
+    const d = String($('enLiderDeclarado').value).trim(), declarado = d === '' ? null : Math.max(0, Math.round(Number(d)));
+    const obj = { tipo: 'lider', id: ST.aliados[L.i]?.id || `lider-${Date.now()}`, nombre, zona: [...L.zona.values()], apoyo: L.apoyo, declarado: Number.isFinite(declarado) ? declarado : null, manual: null };
+    if (L.i === null) { if (ST.aliados.length >= E.MAX) return alert(`Por ahora se pueden sumar hasta ${E.MAX} aliados.`); ST.aliados.push(obj); }
+    else ST.aliados[L.i] = obj;
+    guardar(); cerrarLider();
+    const aviso = $('enAviso');
+    aviso.innerHTML = `<b>Listo: ${esc(nombre)} quedó guardado solo en este navegador.</b> No lo subimos a ningún servidor ni lo vemos nosotros. Si borra los datos del navegador o cambia de computador, tendrá que volver a sumarlo.`;
+    aviso.classList.remove('hidden');
+    await calcular();
+  }
+
+  /* ── Calcular y pintar ─────────────────────────────────────────────── */
+  async function calcular() {
+    const turno = ++ST.turno, lista = $('enLista');
+    if (!ST.aliados.length) {
+      ST.lectura = null;
+      lista.innerHTML = '<p class="helper">Todavía no hay aliados. Búsquelos por nombre arriba.</p>';
+      ['enTotalSec', 'enMapaSec', 'enSolapeSec', 'enNuevosSec'].forEach(id => $(id).classList.add('hidden'));
+      $('enNota').innerHTML = nota(null);
+      try { localStorage.removeItem(K_ULTIMO); } catch (e) {}
+      return;
+    }
+    lista.innerHTML = '<p class="helper">Leyendo la votación de sus aliados, mesa por mesa…</p>';
+    let L;
+    try {
+      const comunaDe = ST.aliados.some(a => a.tipo === 'lider') ? E.comunaDesde(await cargarGeoref()) : null;
+      L = await E.evaluar(ST.aliados, { alcance: ST.alcance, lugar: ST.lugar, enAlcance: E.enAlcance, areaDe: (m, a) => lugar(E.areaDe(m, a)), propio: ST.propio, corpCampana: ST.corp, comunaDe });
+    } catch (e) { lista.innerHTML = '<p class="helper">No pudimos leer la votación de sus aliados. Intente de nuevo.</p>'; return; }
+    if (turno !== ST.turno) return;
+    ST.lectura = L;
+    /* La tarjeta del hub lee esto: la cifra que vio aquí, sin recalcular allá. */
+    try { localStorage.setItem(K_ULTIMO, JSON.stringify({ n: ST.aliados.length, total: L.total, bajo: L.bajo, alto: L.alto, fecha: new Date().toISOString().slice(0, 10) })); } catch (e) {}
+    pintarFichas(L); pintarTotal(L); pintarMapa(L); pintarSolapes(L); pintarNuevos(L);
+    $('enNota').innerHTML = nota(L);
+  }
+
+  function pintarFichas(L) {
+    $('enLista').innerHTML = L.filas.map((f, k) => {
+      const al = f.al, punto = `<span class="en-color" style="background:${colorDe(k)}"></span>`;
+      if (al.tipo === 'lider') return fichaLider(f, k);
+      if (f.error) return `<div class="endoso-fila"><div class="endoso-fila-top"><b>${punto}${esc(al.nombre)}</b><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar">×</button></div><p class="helper">No pudimos leer la votación de esta candidatura.</p></div>`;
+      const par = f.par;
+      const apoyo = al.apoyo
+        ? `<div class="endoso-apoyo">Apoyó a <b>${esc(al.apoyo.nombre)}</b> <small>${esc(rotulo(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="EN.quitarApoyo(${k})">cambiar</button>${regTexto(f)}${par?.valida ? `<span class="endoso-medida">Techo: coincidieron en el <b>${pct0(par.tasa)}</b> de sus votos · ${esc(E.CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">Techo sin medir: ${esc(par?.motivo || 'sin datos')}.</span>`}</div>`
+        : `<button type="button" class="enlace-boton" onclick="EN.apoyo(${k})">+ ¿A quién apoyó antes? (mide la tasa)</button>`;
+      const fuera = f.total - f.terr;
+      return `<div class="endoso-fila">
+        <div class="endoso-fila-top"><div><b>${punto}${esc(al.nombre)}</b><small>${esc(rotulo(al))}</small></div><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar a ${esc(al.nombre)}">×</button></div>
+        <div class="endoso-cifras"><span><b>${num(f.terr)}</b> votos en Medellín${fuera > 0 ? ` <small>(${num(fuera)} fuera, no cuentan)</small>` : ''}</span><span>× <label class="endoso-tasa"><input type="number" min="0" max="100" step="1" value="${Math.round(f.tasa * 100)}" onchange="EN.tasa(${k}, this.value)" ${f.fuente === 'medida' ? 'disabled' : ''} aria-label="Tasa de ${esc(al.nombre)}"> %</label></span><span>= <b class="endoso-est">${num(f.est)}</b>${f.estBajo !== f.estAlto ? ` <small>(entre ${num(f.estBajo)} y ${num(f.estAlto)})</small>` : ''}</span></div>
+        <p class="helper" style="margin:4px 0 6px">${esc(fuenteDe(f))}.</p>
+        ${apoyo}
+        ${f.terr === 0 && f.total > 0 ? '<p class="helper">Ninguno de sus votos cae en Medellín: aquí no le suma.</p>' : ''}
+        ${Number.isFinite(f.solape) && f.solape > .05 ? `<p class="helper">Hasta el ${pct0(f.solape)} de sus votos está en puestos donde usted ya saca votos: parte de ese endoso puede ser voto que ya tiene.</p>` : ''}
+      </div>`;
+    }).join('');
+  }
+  function fichaLider(f, k) {
+    const al = f.al, m = f.lider, quien = al.apoyo ? esc(lugar(al.apoyo.nombre)) : '', punto = `<span class="en-color" style="background:${colorDe(k)}"></span>`, n = (al.zona || []).length;
+    let medida = '';
+    if (m?.valida) {
+      const donde = m.base === 'comuna' ? 'el resto de su comuna' : 'el resto de Medellín';
+      medida = m.efecto > 0
+        ? `<span class="endoso-medida">En sus ${num(m.nZona)} puestos, ${quien} sacó <b>${num(Math.round(m.obs))}</b> votos; votando como ${donde} habría sacado ${num(Math.round(m.esperado))}. Son <b>${num(Math.round(m.efecto))} de más</b> (± ${num(Math.round(1.96 * m.error))}).</span>`
+        : `<span class="endoso-aviso">En sus puestos, ${quien} sacó ${num(Math.round(m.obs))} votos, y votando como ${donde} habría sacado ${num(Math.round(m.esperado))}: no se nota que el líder le haya sumado.</span>`;
+      if (m.sinEleccion) medida += `<span class="endoso-aviso">${num(m.sinEleccion)} de sus puestos no existían en esa elección (el mapa de puestos es de 2026): no entran a la medición.</span>`;
+      if (m.fueraTarjeton) medida += `<span class="endoso-aviso">En ${num(m.fueraTarjeton)} de sus puestos ${quien} no estaba en el tarjetón: no cuentan.</span>`;
+    } else if (al.apoyo) medida = `<span class="endoso-aviso">No se pudo medir: ${esc(m?.motivo || 'sin datos')}.</span>`;
+    let dicho = '';
+    if (Number.isFinite(al.declarado) && al.declarado > 0) {
+      const parte = f.declaradoParte;
+      dicho = `<p class="helper" style="margin:6px 0 0">Dice manejar <b>${num(al.declarado)}</b> votos${parte ? `: es el ${pct0(parte)} de los que votaron en esos puestos en 2023` : ''}.${parte > .3 ? ' Es mucho para una sola persona: tómelo con cuidado.' : ''}${m?.valida && f.origen === 'medido' ? ` La medición dice ${num(Math.round(m.efecto))}: manda la medición.` : ''}</p>`;
+    }
+    const cifras = f.terr > 0
+      ? `<div class="endoso-cifras"><span><b>${num(Math.round(f.terr))}</b> votos ${f.origen === 'declarado' ? 'declarados' : 'de efecto medido'}</span><span>= <b class="endoso-est">${num(f.est)}</b>${f.estBajo !== f.estAlto ? ` <small>(entre ${num(f.estBajo)} y ${num(f.estAlto)})</small>` : ''}</span></div>`
+      : '<div class="endoso-cifras"><span>= <b class="endoso-est">0</b> <small>sin endoso medible</small></span></div>';
+    return `<div class="endoso-fila">
+      <div class="endoso-fila-top"><div><b>${punto}${esc(al.nombre)}</b><small>Líder sin candidatura · ${num(n)} puesto${n === 1 ? '' : 's'} · solo en este navegador</small></div><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar a ${esc(al.nombre)}">×</button></div>
+      ${cifras}
+      <p class="helper" style="margin:4px 0 6px">${esc(fuenteDe(f))}.</p>
+      <div class="endoso-apoyo">${al.apoyo ? `Apoyó a <b>${quien}</b> <small>${esc(rotulo(al.apoyo))}</small>` : 'Sin la candidatura que apoyó.'} <button type="button" class="enlace-boton" onclick="EN.editarLider(${k})">editar zona y datos</button>${medida}</div>
+      ${dicho}
+    </div>`;
+  }
+
+  function pintarTotal(L) {
+    $('enTotalSec').classList.remove('hidden');
+    $('enTotal').textContent = num(L.total);
+    $('enTotalSub').textContent = L.bajo === L.alto ? 'votos, como techo' : `votos, punto medio · entre ${num(L.bajo)} y ${num(L.alto)}`;
+    $('enTecho').textContent = num(L.techo);
+    const meta = ST.meta;
+    $('enMetaCaja').classList.toggle('hidden', !meta);
+    ['enBarraCaja', 'enBarraEt'].forEach(id => $(id).classList.toggle('hidden', !meta));
+    if (meta) {
+      const parte = L.total / meta;
+      $('enMeta').textContent = pct0(parte);
+      $('enMetaSub').textContent = `de su meta de ${num(meta)} votos`;
+      $('enBarra').style.width = `${Math.min(100, Math.max(1, parte * 100))}%`;
+      $('enBarraEt').textContent = parte >= 1 ? 'el endoso estimado supera la meta: revise si los aliados se pisan' : `faltarían ${num(meta - L.total)} votos si todo el endoso llegara`;
+    }
+    const n = ST.aliados.length, quien = n === 1 ? 'Su aliado le puede' : `Sus ${n} aliados le pueden`;
+    $('enTotalTitulo').textContent = L.bajo === L.alto ? `${quien} pasar hasta ${num(L.total)} votos.` : `${quien} pasar entre ${num(L.bajo)} y ${num(L.alto)} votos.`;
+    const sinMedir = L.filas.filter(f => f.fuente === 'retencion').length;
+    const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion' || (f.fuente === 'lider' && f.origen === 'medido')).length, conReg = L.filas.filter(f => f.fuente === 'regresion').length;
+    $('enTotalCopy').innerHTML = (medidos ? `${medidos === 1 ? 'Una tasa sale medida' : `${medidos} tasas salen medidas`} con a quién apoyaron antes${conReg ? ` (${conReg === medidos ? (conReg === 1 ? 'con' : 'todas con') : `${conReg} con`} regresión puesto a puesto)` : ''}.` : 'Ninguna tasa está medida con a quién apoyaron antes.')
+      + (sinMedir ? ` ${sinMedir === 1 ? 'Un aliado se estima' : `${sinMedir} aliados se estiman`} con lo que conserva de su propio voto quien repite en su corporación: es lo más que podría mover.` : '')
+      + ' El rango sale de cuánto varía esa retención entre personas: el extremo bajo es el cuarto que menos conserva, el alto el que más.'
+      + (L.filas.filter(f => !f.error && f.terr).length > 1 ? dobleTexto(L) : '');
+  }
+  function dobleTexto(L) {
+    const base = L.denominador ? '' : ' No tenemos el electorado de la Alcaldía 2023 en todos los puestos, así que en los compartidos sin ese dato se suma.';
+    return `<br><br><b>Sin contar dos veces.</b> Sumando a cada aliado por separado serían ${num(L.suma.total)}; ${L.dobleConteo > 0 ? `${num(L.dobleConteo)} votos se descuentan` : 'no hay nada que descontar'} porque votan en los mismos puestos y parte de esa gente votó por los dos. Ese descuento supone que sus votantes son gente distinta; si en cada puesto fueran los mismos —lo probable cuando los aliados son de la misma corriente—, el punto medio bajaría a <b>${num(L.siSeRepiten)}</b>. La sección 04 dice qué aliados se pisan.${base}`;
+  }
+
+  function pintarNuevos(L) {
+    const sec = $('enNuevosSec'), puestos = L.puestos || [];
+    if (!puestos.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const propio = ST.propio ? E.agrupar(ST.propio, E.codigoPuesto) : {};
+    ST.filasNuevos = puestos.map(p => ({ ...p, suyos: propio[p.code] || 0 }));
+    const nuevo = p => p.suyos < p.total, enNuevos = ST.filasNuevos.filter(nuevo).reduce((t, p) => t + p.total, 0);
+    $('enNuevosCopy').innerHTML = ST.propio
+      ? `El <b>${pct0(enNuevos / Math.max(1, L.total))}</b> del endoso cae en puestos donde usted sacó menos votos de los que le pueden pasar ahí: esos son votos nuevos, no los que ya tiene. Los puestos marcados «nuevo» son donde conviene que el aliado ponga la cara.`
+      : 'Ordenados por cuánto le pueden pasar sus aliados en cada puesto. Si marca su votación anterior arriba, separamos los votos nuevos de los que ya tiene.';
+    const nom = i => esc(lugar(L.filas[i]?.al?.nombre || ''));
+    $('enNuevosFilas').innerHTML = ST.filasNuevos.slice(0, 25).map((p, j) => {
+      const top = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1])[0], g = ST.georef?.[p.code];
+      return `<tr><td class="num">${j + 1}</td><td><b>${esc(lugar(g?.nombre || p.nombre || p.code))}</b><br><small>${esc(lugar(g?.barrio || p.comNom || p.munNom || ''))}</small></td>
+        <td class="num">${num(Math.round(p.total))}</td><td class="num">${ST.propio ? num(p.suyos) : '—'}</td><td>${top ? nom(top[0]) : ''}${ST.propio && nuevo(p) ? ' <span class="dd-marca bien">nuevo</span>' : ''}</td></tr>`;
+    }).join('');
+  }
+  function descargarCsv() {
+    const L = ST.lectura; if (!L?.puestos?.length) return;
+    const nom = i => L.filas[i]?.al?.nombre || '';
+    const cab = ['#', 'Codigo', 'Puesto', 'Barrio o comuna', 'Municipio', 'Endoso bajo', 'Endoso punto medio', 'Endoso alto', 'Aliados en el puesto', 'Aliado que mas pesa', 'Votos suyos antes'];
+    const propio = ST.propio ? E.agrupar(ST.propio, E.codigoPuesto) : {};
+    const filas = L.puestos.map((p, j) => {
+      const g = ST.georef?.[p.code], top = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1])[0];
+      return [j + 1, p.code, g?.nombre || p.nombre, g?.barrio || p.comNom, p.munNom || g?.mesa?.munNom || '', Math.round(p.bajo), Math.round(p.total), Math.round(p.alto), p.aliados, top ? nom(top[0]) : '', ST.propio ? (propio[p.code] || 0) : ''];
+    });
+    const esc_ = v => { const x = String(v ?? ''); return /[";\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+    const texto = '﻿' + [cab, ...filas].map(f => f.map(esc_).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([texto], { type: 'text/csv;charset=utf-8' }));
+    a.download = `endoso-aliados-medellin-${L.puestos.length}-puestos.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  function pintarSolapes(L) {
+    const pares = E.solapes(L), sec = $('enSolapeSec');
+    if (!pares.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const nom = i => esc(lugar(L.filas[i].al.nombre));
+    $('enSolapes').innerHTML = pares.slice(0, 15).map(x => `<li><span class="arq-punto" style="background:${x.coincidencia >= .6 ? '#c88a2e' : 'var(--done)'}"></span><b>${pct0(x.coincidencia)}</b> ${nom(x.i)} <span style="color:var(--text3)">y</span> ${nom(x.j)}<em>${num(x.puestos)} puestos</em></li>`).join('');
+    const fuertes = pares.filter(x => x.coincidencia >= .6).length;
+    $('enSolapeCopy').innerHTML = `Para cada par, qué parte de los votos del más chico cae en puestos donde el otro también saca votos. ${fuertes ? `<b>${num(fuertes)} ${fuertes === 1 ? 'par se pisa' : 'pares se pisan'}</b> en más del 60 %: ahí sumarlos es contar dos veces a buena parte de la misma gente, y conviene que trabajen territorios distintos.` : 'Ningún par se pisa en más del 60 %: sus territorios se complementan.'} Es geografía, no votantes: dice dónde puede haber doble conteo, no cuánto lo hay.`;
+  }
+
+  async function pintarMapa(L) {
+    const puestos = E.porPuesto(L), sec = $('enMapaSec');
+    if (!puestos.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const max = Math.max(1, ...L.areas.map(a => a.v));
+    $('enAreas').innerHTML = L.areas.slice(0, 21).map(a => `<li><span class="arq-punto" style="background:var(--accent)"></span><b>${num(a.v)}</b> ${esc(a.nombre)}<em>${Math.round(a.v / max * 100)} %</em></li>`).join('');
+    $('enLeyenda').innerHTML = L.filas.map((f, k) => f.error ? '' : `<span><span class="en-color" style="background:${colorDe(k)}"></span>${esc(lugar(f.al.nombre))}</span>`).join('');
+    await cargarGeoref();
+    if (!ST.mapa) {
+      ST.mapa = window.L.map('enMapa', { scrollWheelZoom: false, zoomSnap: .25, zoomDelta: .5 }).setView([6.25, -75.58], 12);
+      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(ST.mapa);
+    }
+    if (ST.capa) { ST.mapa.removeLayer(ST.capa); ST.capa = null; }
+    const conPunto = puestos.map(p => ({ p, g: ST.georef[p.code] })).filter(x => x.g && Number.isFinite(x.g.lat) && Number.isFinite(x.g.lng) && x.g.lat);
+    const tope = Math.max(1, ...conPunto.map(x => x.p.total));
+    ST.capa = window.L.featureGroup(conPunto.map(({ p, g }) => {
+      const partes = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1]), dom = Number(partes[0][0]);
+      const detalle = partes.slice(0, 3).map(([i, v]) => `${esc(lugar(L.filas[i].al.nombre))}: ${num(Math.round(v))}`).join('<br>');
+      return window.L.circleMarker([g.lat, g.lng], { radius: 3 + 15 * Math.sqrt(p.total / tope), color: '#fff', weight: 1, fillColor: colorDe(dom), fillOpacity: .78 })
+        .bindTooltip(`<b>${esc(lugar(g.nombre || p.nombre))}</b><br>${esc(lugar(g.barrio || p.comNom || p.munNom))}<br><b>${num(Math.round(p.total))}</b> votos de endoso (punto medio)${p.aliados > 1 ? `, ya sin contar dos veces a quien votó por ${p.aliados === 2 ? 'los dos' : `varios de sus ${p.aliados} aliados`}` : ''}<br>${detalle}`, { sticky: true, className: 'tp' });
+    })).addTo(ST.mapa);
+    const sin = puestos.length - conPunto.length;
+    $('enMapaCopy').textContent = `Cada círculo es un puesto de votación: el tamaño es cuánto le pueden pasar ahí y el color, qué aliado pesa más.${sin ? ` ${num(sin)} puesto${sin === 1 ? '' : 's'} sin coordenada publicada no ${sin === 1 ? 'aparece' : 'aparecen'} en el mapa, pero sí ${sin === 1 ? 'cuenta' : 'cuentan'} en las cifras.` : ''}`;
+    /* Leaflet mide el contenedor al crearse: reencuadrar después del layout, con
+       setTimeout (requestAnimationFrame se congela con la pestaña oculta), sobre
+       los puestos que suman el 95 % del endoso para que un corregimiento lejano
+       no deje la ciudad del tamaño de una uña. */
+    setTimeout(() => {
+      ST.mapa.invalidateSize();
+      const orden = conPunto.slice().sort((a, b) => b.p.total - a.p.total), meta95 = .95 * orden.reduce((s, x) => s + x.p.total, 0);
+      let acum = 0; const nucleo = orden.filter(x => { const dentro = acum < meta95; acum += x.p.total; return dentro; });
+      const b = window.L.latLngBounds(nucleo.map(x => [x.g.lat, x.g.lng]));
+      if (b.isValid()) ST.mapa.fitBounds(b, { padding: [16, 16], maxZoom: 15, animate: false });
+    }, 0);
+  }
+
+  function nota(L) {
+    const supuesto = L?.filas.some(f => f.fuente === 'supuesto');
+    return `<b>Es una estimación, y es un techo.</b> Usa el mismo motor del panel de endoso de Candidato 360. La tasa medida es la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir: dice cuánto electorado cabía en común, no cuánto se pasó. Cuando hay votos válidos por puesto en las dos elecciones, el centro del rango sale de una regresión puesto a puesto que estima qué parte de sus votantes votó por la persona que apoyó. Mide votantes compartidos, no convencidos: si los dos son de la misma corriente, parte de esa cifra es afinidad y no endoso. Encima va el tiempo: nadie le pasa a otro más de lo que conservaría de su propio voto si se lanzara él mismo, y eso está medido con quienes repitieron en la misma corporación entre 2011 y 2023 (o en el Congreso entre 2014 y 2022). Solo cuentan los votos que caen en Medellín. Si dos aliados trabajan los mismos puestos no se suman: en cada puesto se combinan contra los votos válidos de la Alcaldía 2023, suponiendo que alcanzan a gente distinta.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados, la meta y su votación anterior viven en este navegador: no se guardan en el servidor.`;
+  }
+
+  window.EN = A;
+  window.PDCEndoso = { lectura: () => ST.lectura, estado: () => ST, calcular };   /* para depurar */
+
+  /* ── Arranque ──────────────────────────────────────────────────────── */
+  const metaInp = $('enMetaInput');
+  if (ST.meta) metaInp.value = ST.meta;
+  metaInp.addEventListener('change', () => {
+    const v = Math.max(0, Math.round(Number(metaInp.value) || 0)); ST.meta = v;
+    try { v ? localStorage.setItem(K_META, String(v)) : localStorage.removeItem(K_META); } catch (e) {}
+    if (ST.lectura) pintarTotal(ST.lectura);
+  });
+  pintarPropio();
+  $('enCsv').addEventListener('click', descargarCsv);
+  $('enNuevoLider').addEventListener('click', () => abrirLider(null));
+  $('enLiderCancelar').addEventListener('click', cerrarLider);
+  $('enLiderGuardar').addEventListener('click', guardarLider);
+  $('enLiderComuna').addEventListener('change', e => {
+    const c = e.target.value; if (!c || !ST.lider) return;
+    (ST.puestosTerr || []).filter(x => x.comuna === c).forEach(x => ST.lider.zona.set(x.code, zonaItem(x.code, x.g)));
+    e.target.value = ''; pintarMapaLider();
+  });
+  $('enBuscar').addEventListener('input', e => { clearTimeout(temporizador); temporizador = setTimeout(() => buscar(e.target.value), 90); });
+  await cargarPropio();
+  calcular();
+
+  const pintarIndice = () => { $('enIndice').textContent = ST.indiceListo ? `${num(ST.indice.length)} candidaturas para buscar` : `${num(ST.indice.length)} candidaturas cargadas · faltan concejos y JAL`; };
+  const apilar = lista => { ST.indice.push(...lista); pintarIndice(); const q = $('enBuscar').value; if (q.trim().length >= 2) buscar(q); };
+  await Promise.allSettled([
+    CandRegistry.load({ includeParties: false, onSource: apilar }),
+    CandRegistry.loadLocal({ includeParties: false, onSource: apilar }),
+  ]);
+  ST.indiceListo = true; pintarIndice();
+  })(); }
+  </script>
+</body>
+</html>
